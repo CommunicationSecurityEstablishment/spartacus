@@ -64,5 +64,3 @@ class Capua:
 
         self.ifu = InstructionFetchUnit(self.ma)
         self.eu = ExecutionUnit(self.mioc, self.ifu, name)
-
-

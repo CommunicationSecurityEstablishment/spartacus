@@ -231,5 +231,3 @@ class TestInstructionFetchUnit(unittest.TestCase):
         self.assertIsNone(ins.destinationImmediate)
         self.assertIsNone(ins.width)
         self.assertIsNone(ins.flags)
-
-

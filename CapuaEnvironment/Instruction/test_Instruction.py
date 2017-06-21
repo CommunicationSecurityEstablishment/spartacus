@@ -185,6 +185,3 @@ class TestInstruction(unittest.TestCase):
         self.assertEqual(0b10, ins._extractValueFromBinaryField(0b00011000, 0b11110111))
         self.assertEqual(0b10, ins._extractValueFromBinaryField(0b00000011, 0b11111110))
         self.assertEqual(0b00, ins._extractValueFromBinaryField(0b00000000, 0b11111110))
-
-
-

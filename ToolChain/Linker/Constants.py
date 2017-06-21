@@ -32,4 +32,3 @@ __status__ = "Dev"
 
 DEFAULT_LOAD_ADDRESS = MEMORY_START_AT
 UNDEFINED = "&&undefined&&"
-

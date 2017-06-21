@@ -108,4 +108,3 @@ if __name__ == '__main__':
                          "input file syntax (I know this error sucks... Sorry :) ). This 'should not' "
                          "have happened, please report this error to maintainer so we can all get a more "
                          "stable assembler. If you don't report, don't whine about this!")
-

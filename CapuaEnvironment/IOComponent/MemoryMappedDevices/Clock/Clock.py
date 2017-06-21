@@ -86,27 +86,3 @@ class Clock(BaseDevice):
         intData = struct.unpack(">I", rData)[0]
 
         return intData
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

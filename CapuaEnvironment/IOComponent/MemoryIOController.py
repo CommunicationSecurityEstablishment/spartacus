@@ -162,7 +162,6 @@ class MemoryIOController:
                                                                              length=length,
                                                                              isWrite=False)
         else:
-            extractedValue = 0
             extractedMemoryCells = self._memoryArray.extractMemory(address, length)
             valueToBeUnpacked = b""
 
@@ -193,7 +192,6 @@ class MemoryIOController:
         :param source: str, this is a marker to identify an action, usually the name associated with an execution unit
         :return: int value if read, None otherwise
         """
-        returnValue = None
 
         # We need to find a device that accept response for this memory access
         selectedDevice = None

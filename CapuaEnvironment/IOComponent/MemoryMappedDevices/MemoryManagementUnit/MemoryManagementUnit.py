@@ -47,7 +47,6 @@ class MemoryManagementUnit(BaseDevice):
     maskOffset = 4  # Where The length in memory for action format MMMM MMMM This is 1 bytes long
     confirmPermissionOffset = 5  # Confirmation flag and new permission set format is CPPP 0000 This is 1 byte long
 
-
     def __init__(self, parentMIOC=None):
         super(MemoryManagementUnit, self).__init__(parentMIOC=parentMIOC)
         self.data = b"\x00" * 0xFF

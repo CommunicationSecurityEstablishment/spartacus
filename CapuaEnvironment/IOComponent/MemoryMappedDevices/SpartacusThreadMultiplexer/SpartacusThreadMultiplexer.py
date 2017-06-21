@@ -24,7 +24,6 @@ from CapuaEnvironment.IOComponent.MemoryMappedDevices.BaseDevice import BaseDevi
 from Configuration.Configuration import SPARTACUS_MAXIMUM_CONTEXT
 
 import struct
-import time
 
 __author__ = "CSE"
 __copyright__ = "Copyright 2015, CSE"

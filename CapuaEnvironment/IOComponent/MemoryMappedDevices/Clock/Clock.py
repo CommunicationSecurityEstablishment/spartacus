@@ -60,7 +60,6 @@ class Clock(BaseDevice):
         :return: Numeric value
         """
         # House keeping!
-        result = 0
         offset = self._translateAddressToOffset(address=address)
         self._confirmMemoryAccess(offset=offset, length=length)
 

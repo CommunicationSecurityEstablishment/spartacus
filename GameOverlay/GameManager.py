@@ -206,11 +206,9 @@ class GameManager:
         :param inputFile: string, path to the file that needs to be loaded into memory.
         :return: the content of the file in the form of a byte array
         """
-        content = b""
 
-        binFile = open(inputFile, "rb")
-        content = binFile.read()
-        binFile.close()
+        with open(inputFile, "rb") as binFile:
+            content = binFile.read()
 
         return content
 

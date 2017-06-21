@@ -106,6 +106,5 @@ class Assembler:
         :return:
         """
 
-        file = open(file, mode="wb")
-        file.write(outputData)
-        file.close()
+        with open(file, mode="wb") as f:
+            f.write(outputData)

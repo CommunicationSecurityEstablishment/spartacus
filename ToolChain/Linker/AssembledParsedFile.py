@@ -67,9 +67,8 @@ class AssembledParsedFile:
         :param inputFile: The input file that needs to be used in order to populate this object
         :return: No return this will simply set the object attributes accordingly
         """
-        binFile = open(inputFile, "rb")
-        data = binFile.read()
-        binFile.close()
+        with open(inputFile, "rb") as binFile:
+            data = binFile.read()
 
         self.externalReferences = self._extractGlobalReferences(data=data)
         self.internalReferences = self._extractInternalReferences(data=data)

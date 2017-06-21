@@ -23,12 +23,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 from CapuaEnvironment.Instruction.Instruction import Instruction
 from CapuaEnvironment.IntructionFetchUnit.InstructionFetchUnit import InstructionFetchUnit
 from CapuaEnvironment.IOComponent.MemoryIOController import MemoryIOController
-from Configuration.Configuration import MEMORY_START_AT, \
-                                        MEMORY_END_AT, \
-                                        REGISTER_A, \
-                                        REGISTER_B, \
-                                        REGISTER_C, \
-                                        REGISTER_S
+from Configuration.Configuration import (
+    MEMORY_START_AT, MEMORY_END_AT, REGISTER_A, REGISTER_B, REGISTER_C, REGISTER_S)
 
 __author__ = "CSE"
 __copyright__ = "Copyright 2015, CSE"
@@ -61,6 +57,9 @@ class ExecutionUnit:
     # Simple "process" identification token, this is changed to the name of the player
     # program when in game mode
     name = "System"
+
+    _registers = dict(zip(
+        (REGISTER_A, REGISTER_B, REGISTER_C, REGISTER_S), 'ABCS'))
 
     def __init__(self, mioc: MemoryIOController=None, ifu: InstructionFetchUnit=None, name: str="System"):
         """
@@ -120,16 +119,11 @@ class ExecutionUnit:
         :return:
         """
         value &= 0xFFFFFFFF
-        if registerCode == REGISTER_A:
-            self.A = value
-        elif registerCode == REGISTER_B:
-            self.B = value
-        elif registerCode == REGISTER_C:
-            self.C = value
-        elif registerCode == REGISTER_S:
-            self.S = value
-        else:
-            raise ValueError("Core {} caused an invalid instruction to be executed - GameOver". format(self.name,))
+        try:
+            setattr(self, self._registers[registerCode], value)
+        except KeyError:
+            raise ValueError(
+                "Core {} caused an invalid instruction to be executed - GameOver".format(self.name))
 
     def getRegisterValue(self, registerCode=None):
         """
@@ -138,18 +132,11 @@ class ExecutionUnit:
         :param registerCode: int, from 0b00 to 0b11
         :return:
         """
-        if registerCode == REGISTER_A:
-            register = self.A
-        elif registerCode == REGISTER_B:
-            register = self.B
-        elif registerCode == REGISTER_C:
-            register = self.C
-        elif registerCode == REGISTER_S:
-            register = self.S
-        else:
+        try:
+            return getattr(self, self._registers[registerCode])
+        except KeyError:
             raise ValueError("Core exception access to invalid register")
 
-        return register
 
 class LogicUnit:
     """
@@ -226,8 +213,6 @@ class LogicUnit:
         ADD imm, dReg        : Total Length 5B : ID 0b0111 11 : dR 00 : sI 4B: exec time = 1 : Addition
         :return: 0, resets the flags
         """
-        sourceValue = 0
-        destinationValue = 0
 
         destinationValue = self.eu.getRegisterValue(registerCode=self.ci.destinationRegister)
 
@@ -248,8 +233,6 @@ class LogicUnit:
         AND imm, dReg    : Total Length 5B : ID 0b0101 01 : dR 00 : sI 4B : exec time = 1 : Binary and
         :return: 0, resets the flags
         """
-        sourceValue = 0
-        destinationValue = 0
 
         destinationValue = self.eu.getRegisterValue(registerCode=self.ci.destinationRegister)
 
@@ -288,8 +271,6 @@ class LogicUnit:
         self.eu.mioc.memoryWriteAtAddressForLength(stackPointer, 4, returnIAddress, source=self.eu.name)
 
         # Now we can transfer execution to CALL destination for next execution
-        sourceValue = 0
-
         if self.ci.sourceImmediate is None:
             sourceValue = self.eu.getRegisterValue(registerCode=self.ci.sourceRegister)
         else:
@@ -309,8 +290,6 @@ class LogicUnit:
 
         :return: This affects the FLAGS!!!!
         """
-        sourceValue = 0
-        destinationValue = 0
 
         destinationValue = self.eu.getRegisterValue(registerCode=self.ci.destinationRegister)
 
@@ -337,8 +316,6 @@ class LogicUnit:
         DIV sReg, dReg  : Total Length 2B : ID 0b1001 10 : sR 00 : dR 1B : exec time = 3 : Division, result is put in A, rest is put in B
         :return: 0, resets the flags
         """
-        sourceValue = 0
-        destinationValue = 0
 
         destinationValue = self.eu.getRegisterValue(registerCode=self.ci.destinationRegister)
 
@@ -435,8 +412,6 @@ class LogicUnit:
         MEMR[WIDTH] sReg, dReg          : Total Length 2B : ID 0b0000 11 : wD 00 : sR 0000 : dR 0000 : exec time = 2 : Same as previous, content of reg is used as a pointer
         :return: 0, resets the flags
         """
-        sourceValue = 0
-        destinationValue = 0
 
         # Validate width
         if 0 >= self.ci.width > 4:
@@ -461,8 +436,6 @@ class LogicUnit:
         MEMW[WIDTH] sImm, dImm          : Total Length 9B : ID 0b0001 11 : wD 00 : sI 4B : dI 4B : exec time = 3 : Write an immediate value to a memory address (given as an immediate value)
         :return: 0, resets the flags
         """
-        sourceValue = 0
-        destinationValue = 0
 
         # Validate width
         if 0 >= self.ci.width > 4:
@@ -498,8 +471,6 @@ class LogicUnit:
         MOV sImm, dReg  : Total Length 5B : ID 0b0000 01 : dR 00 : sI 4B : exec time = 1 : Mov an immediate to a register
         :return: 0, resets the flags
         """
-        sourceValue = 0
-        destinationValue = 0
 
         if self.ci.sourceImmediate is None:
             sourceValue = self.eu.getRegisterValue(registerCode=self.ci.sourceRegister)
@@ -517,8 +488,6 @@ class LogicUnit:
         MUL sReg, dReg : Total Length 2B : ID 0b1001 01 : sR 00 : dR 1B : exec time = 2 : Multiplication, result is put in B:A
         :return: 0, resets the flags
         """
-        sourceValue = 0
-        destinationValue = 0
 
         destinationValue = self.eu.getRegisterValue(registerCode=self.ci.destinationRegister)
 
@@ -548,7 +517,6 @@ class LogicUnit:
         NOT Reg     : Total Length 1B : ID 0b1000 10 : R 00 : exec time = 1 : Negation (bit inversion)
         :return: 0, resets the flags
         """
-        sourceValue = 0
 
         sourceValue = self.eu.getRegisterValue(registerCode=self.ci.sourceRegister)
 
@@ -564,8 +532,6 @@ class LogicUnit:
         OR imm, dReg        : Total Length 5B : ID 0b0101 11 : dR 00 : sI 4B : exec time = 1 : Binary or
         :return: 0, resets the flags
         """
-        sourceValue = 0
-        destinationValue = 0
 
         destinationValue = self.eu.getRegisterValue(registerCode=self.ci.destinationRegister)
 
@@ -619,11 +585,8 @@ class LogicUnit:
         """
 
         # Lets adjust the stack!
-        stackPointer = self.eu.S
         stackPointer = self.eu.S + 4  # Stack grows upward!!!
         self.eu.S = stackPointer
-
-        sourceValue = 0
 
         if self.ci.sourceImmediate is None:
             sourceValue = self.eu.getRegisterValue(registerCode=self.ci.sourceRegister)
@@ -669,8 +632,6 @@ class LogicUnit:
         SHL imm, dReg         : Total Length 5B : ID 0b0111 01 : dR 00 : sI 4B: exec time = 1 : Shift Left
         :return: 0, resets the flags
         """
-        sourceValue = 0
-        destinationValue = 0
 
         destinationValue = self.eu.getRegisterValue(registerCode=self.ci.destinationRegister)
 
@@ -691,8 +652,6 @@ class LogicUnit:
         SHR imm, dReg        : Total Length 5B : ID 0b0110 11 : dR 00 : sI 4B : exec time = 1 : Shift Right
         :return: 0, resets the flags
         """
-        sourceValue = 0
-        destinationValue = 0
 
         destinationValue = self.eu.getRegisterValue(registerCode=self.ci.destinationRegister)
 
@@ -720,8 +679,6 @@ class LogicUnit:
         SUB imm, dReg      : Total Length 5B : ID 0b1000 01 : dR 00 : sI 4B : exec time = 1 : Subtraction
         :return: 0, resets the flags
         """
-        sourceValue = 0
-        destinationValue = 0
 
         destinationValue = self.eu.getRegisterValue(registerCode=self.ci.destinationRegister)
 
@@ -742,9 +699,6 @@ class LogicUnit:
         XOR imm, dReg        : Total Length 5B : ID 0b0110 01 : dR 00 : sI 4B : exec time = 1 : Binary xor
         :return: 0, resets the flags
         """
-
-        sourceValue = 0
-        destinationValue = 0
 
         destinationValue = self.eu.getRegisterValue(registerCode=self.ci.destinationRegister)
 

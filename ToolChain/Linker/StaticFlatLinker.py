@@ -101,9 +101,8 @@ class StaticFlatLinker:
             if softwareLoader:
                 self.finalFileContent = struct.pack(">I", loadAddress) + self.finalFileContent
             # Write the file to disk
-            finalFile = open(outputFile, "wb")
-            finalFile.write(self.finalFileContent)
-            finalFile.close()
+            with open(outputFile, 'wb') as finalFile:
+                finalFile.write(self.finalFileContent)
         else:
             raise ValueError("Unresolved reference {}".format((unresolvedReference.decode(),)))
 
@@ -116,16 +115,15 @@ class StaticFlatLinker:
         :param fileName:
         :return:
         """
-        file = open(fileName, "w")
-        symbolsList = list(self.symbols.keys())
-        symbolsList.sort()
 
-        for symbol in symbolsList:
-            file.write(symbol + ":" + hex(struct.unpack(">I", self.symbols[symbol])[0]) + "\n")
+        symbolsList = sorted(self.symbols.keys())
 
-        file.close()
+        with open(fileName, 'w') as f:
+            for symbol in symbolsList:
+                f.write('{}:{}\n'.format(
+                    symbol, hex(struct.unpack(">I", self.symbols[symbol])[0]))
+                )
 
-        return
 
     def _resolveInternalReferences(self, file=None, offset=0):
         """

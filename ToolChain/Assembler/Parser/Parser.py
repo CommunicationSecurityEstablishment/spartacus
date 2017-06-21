@@ -86,11 +86,9 @@ class Parser:
         :param file: String, the name of the file that needs to be read in to build the code
         :return: list: Content of the file, line by line.
         """
-        content = None
 
-        codeFile = open(file, "r")
-        origContent = codeFile.readlines()
-        codeFile.close()
+        with open(file, "r") as codeFile:
+            origContent = codeFile.readlines()
 
         content = []
         for line in origContent:

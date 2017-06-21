@@ -98,9 +98,8 @@ class Debugger:
 
         self.debugLog("Loading symbols from file {}".format(symbolsFile,))
 
-        file = open(symbolsFile, "r")
-        content = file.readlines()
-        file.close()
+        with open(symbolsFile, "r") as f:
+            content = f.readlines()
 
         for line in content:
             if line != "":
@@ -213,11 +212,9 @@ class Debugger:
         :param inputFile: string, path to the file that needs to be loaded into memory.
         :return: the content of the file in the form of a byte array
         """
-        content = b""
 
-        binFile = open(inputFile, "rb")
-        content = binFile.read()
-        binFile.close()
+        with open(inputFile, "rb") as binFile:
+            content = binFile.read()
 
         return content
 

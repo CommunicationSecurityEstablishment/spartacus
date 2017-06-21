@@ -1677,4 +1677,3 @@ class TestParser(unittest.TestCase):
                           self.parser._getInstructionCodeAndFormUsingPossibleCodes,
                           buildInstruction,
                           possibleCodes)
-

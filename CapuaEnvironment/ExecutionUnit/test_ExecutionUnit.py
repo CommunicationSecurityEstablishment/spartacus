@@ -146,5 +146,3 @@ class TestExecutionUnit(unittest.TestCase):
         self.assertEqual(0, self.eu.C)
         self.assertEqual(0, self.eu.S)
         self.assertEqual(0, self.eu.FLAGS)
-
-

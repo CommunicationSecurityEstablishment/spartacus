@@ -257,4 +257,3 @@ class MemoryIOController:
             raise ValueError("Invalid mask for memory mapped device")
 
         self._memoryMappedDevice.append(device)
-

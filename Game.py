@@ -95,5 +95,3 @@ if __name__ == '__main__':
     arena.displayFirstInterface(p1=p1UsableName, p2=p2UsableName)
 
     gm = GameManager(p1File=usableArgs.p1, p1Name=p1UsableName, p2File=usableArgs.p2, p2Name=p2UsableName)
-
-

@@ -119,4 +119,3 @@ if __name__ == '__main__':
                          "input files (I know this error sucks... Sorry :) ). This 'should not' "
                          "have happened, please report this error to maintainer so we can all get a more "
                          "stable linker. If you don't report, don't whine about this!")
-

@@ -143,4 +143,3 @@ class BaseDevice:
 
         if 0 >= length > 4:
             raise ValueError("Device - invalid length detected in read instruction")
-

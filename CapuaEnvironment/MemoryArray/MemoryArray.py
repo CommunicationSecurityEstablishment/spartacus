@@ -21,9 +21,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 """
 
 from CapuaEnvironment.MemoryArray.MemoryCell.MemoryCell import MemoryCell
-from Configuration.Configuration import MEMORY_START_AT, \
-                                        MEMORY_CELL_INITIAL_VALUE, \
-                                        MEMORY_END_AT
+from Configuration.Configuration import (
+    MEMORY_START_AT, MEMORY_CELL_INITIAL_VALUE, MEMORY_END_AT)
 
 __author__ = "CSE"
 __copyright__ = "Copyright 2015, CSE"
@@ -92,7 +91,6 @@ class MemoryArray:
         :param address: The address for which we want the index
         :return: int representing the index at which an address can be accessed
         """
-        index = None
 
         # First, is the address in a valid range
         if MEMORY_START_AT > address or address >= MEMORY_END_AT:

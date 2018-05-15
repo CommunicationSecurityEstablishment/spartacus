@@ -53,7 +53,7 @@ class Terminal(BaseDevice):
 
     def __init__(self, parentMIOC=None):
         super(Terminal, self).__init__(parentMIOC=parentMIOC)
-        self._data = b"\x00" * 0xFFF
+        self._data = b"\x20" * 0xFFF
         self.startAddress = 0x20001000      # Display is mapped from 0x20001000 to 0x200017ff
                                             # Keyboard is mapped from 0x20001800 all the way to end of range
                                             # but only the first byte is used

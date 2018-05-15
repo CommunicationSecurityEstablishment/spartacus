@@ -1,0 +1,628 @@
+;TIC TAC TOE game
+
+;register A originally contains the vectors and interrupts
+;once interrupt is activated, register A holds the keyboard memory location to read input
+;register B reads keyboard input and holds character value (ASCII)
+;register C is the counter to determine how many turns have passed (resets after 9)
+;register D is assigned the X or O value. This assignment is updated every turn based on G's value
+;register E is used for testing winning combinations in the wincheck function
+;register F is a flag holder to determine whether the game has ended or not
+;F is also used to print the winner of the game (or a draw)
+;register G holds 1 or 0, determining whether it's X's turn or O's turn
+;register S simply holds the end function location to activate stack
+
+;note: the reset button (r) works, but does not consume the last scan entry.
+;Thus, it may end the game prematurely. This can be worked on later.
+;As of now, there is no handling for entering X or O where there a slot is already occupied.
+
+;Two memory locations are used: 0x40004000 and 0x40004001. They hold the number of wins for O and X respectively
+;In the owins and xwins functions, the value is read from memory, incremented, stored, and printed
+
+.global start
+
+start:
+    MOV stack $S
+    MOV #0x40004000 $A
+    MOV #0x30 $B
+    MEMW [1] $B $A
+    ADD #1 $A
+    MEMW [1] $B $A
+pre_game:
+    CALL instructions
+    MOV vector $A
+    MOV #0 $C
+    MOV #0 $F
+    MOV #0 $G
+    SIVR $A
+    ACTI
+
+loop: ;this is just an endless loop for the whole thing to execute
+    NOP
+    JMP <> loop
+
+clockHandler:
+    HIRET
+
+;once interrupt is activated, the keyboardhandler is active. this is where everything happens
+keyboardHandler:
+;checks if it's X's turn or O's turn before taking in user input. G register alternates each turn
+setup:
+    CMP #0 $G
+    JMP <E> oprint
+    CMP #1 $G
+    JMP <E> xprint
+begin:
+    MOV #0x20001800 $A
+    MEMR [1] $A $B
+    CMP #0x52 $B
+    JMP <E> clear ;if we hit R, reset the game
+    CMP #0x51 $B
+    JMP <E> topleft
+    CMP #0x57 $B
+    JMP <E> topcenter
+    CMP #0x45 $B
+    JMP <E> topright
+    CMP #0x41 $B
+    JMP <E> midleft
+    CMP #0x53 $B
+    JMP <E> midcenter
+    CMP #0x44 $B
+    JMP <E> midright
+    CMP #0x5A $B
+    JMP <E> bottomleft
+    CMP #0x58 $B
+    JMP <E> bottomcenter
+    CMP #0x43 $B
+    JMP <E> bottomright
+ending:
+    CMP #1 $F
+    JMP <E> nowin
+    JMP <> wincheck
+nowin:
+    CMP #10 $C
+    JMP <E> clear
+    HIRET
+
+topleft:
+    MOV #0x20001500 $A
+    ;todo: find a way to consume keyboard entry and read the next input
+    ;MEMR [1] $A $E ;read character at print location
+    ;CMP #0x20 $E ;check to see if it's empty (ASCII space is 0x20)
+    ;JMP <LH> location_occupied ;if something is there, simply start over, don't increment register G
+    MEMW [1] $D $A
+    ADD #1 $C
+    JMP <> ending
+
+topcenter:
+    MOV #0x20001502 $A
+    MEMW [1] $D $A
+    ADD #1 $C
+    JMP <> ending
+
+topright:
+    MOV #0x20001504 $A
+    MEMW [1] $D $A
+    ADD #1 $C
+    JMP <> ending
+
+midleft:
+    MOV #0x200015A0 $A
+    MEMW [1] $D $A
+    ADD #1 $C
+    JMP <> ending
+
+midcenter:
+    MOV #0x200015A2 $A
+    MEMW [1] $D $A
+    ADD #1 $C
+    JMP <> ending
+
+midright:
+    MOV #0x200015A4 $A
+    MEMW [1] $D $A
+    ADD #1 $C
+    JMP <> ending
+
+bottomleft:
+    MOV #0x20001640 $A
+    MEMW [1] $D $A
+    ADD #1 $C
+    JMP <> ending
+
+bottomcenter:
+    MOV #0x20001642 $A
+    MEMW [1] $D $A
+    ADD #1 $C
+    JMP <> ending
+
+bottomright:
+    MOV #0x20001644 $A
+    MEMW [1] $D $A
+    ADD #1 $C
+    JMP <> ending
+
+clear:
+    MOV #0x20001000 $A
+    MOV #2000 $B
+    MOV #0 $C
+clear_loop:
+    MEMW [4] #0x20202020 $A
+    ADD #4 $C
+    ADD #4 $A
+    CMP $C $B
+    JMP <L> clear_loop
+    MOV #0 $C
+    CALL instructions
+    MOV #0 $F
+    JMP <> keyboardHandler
+
+oprint:
+    MOV #1 $G ;next turn, setup will jump to xprint for X's turn
+    MOV #0x4F $D
+    JMP <> begin
+
+xprint:
+    MOV #0 $G ;next turn, setup will jump to oprint for O's turn
+    MOV #0x58 $D
+    JMP <> begin
+
+location_occupied:
+    CMP #0x00 $G
+    JMP <E> null_setup1
+    CMP #0x01 $G
+    JMP <E> null_setup2
+    JMP <> setup ;this shouldn't happen but this is just for safety
+
+null_setup1:
+    MOV #1 $G
+    JMP <> setup
+
+null_setup2:
+    MOV #0 $G
+    JMP <> setup
+
+;this function checks every memory location printed for all winning combinations
+;the code is tediously long but seems to work. There are 8 cases for O and X each
+wincheck:
+case_1:
+    MOV #0x20001500 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_2
+    CMP #0x58 $E
+    JMP <E> case_2
+    MOV #0x20001502 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_2
+    CMP #0x58 $E
+    JMP <E> case_2
+    MOV #0x20001504 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_2
+    CMP #0x58 $E
+    JMP <E> case_2
+    JMP <> owins
+case_2:
+    MOV #0x200015A0 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_3
+    CMP #0x58 $E
+    JMP <E> case_3
+    MOV #0x200015A2 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_3
+    CMP #0x58 $E
+    JMP <E> case_3
+    MOV #0x200015A4 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_3
+    CMP #0x58 $E
+    JMP <E> case_3
+    JMP <> owins
+case_3:
+    MOV #0x20001640 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_4
+    CMP #0x58 $E
+    JMP <E> case_4
+    MOV #0x20001642 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_4
+    CMP #0x58 $E
+    JMP <E> case_4
+    MOV #0x20001644 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_4
+    CMP #0x58 $E
+    JMP <E> case_4
+    JMP <> owins
+case_4:
+    MOV #0x20001500 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_5
+    CMP #0x58 $E
+    JMP <E> case_5
+    MOV #0x200015A0 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_5
+    CMP #0x58 $E
+    JMP <E> case_5
+    MOV #0x20001640 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_5
+    CMP #0x58 $E
+    JMP <E> case_5
+    JMP <> owins
+case_5:
+    MOV #0x20001502 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_6
+    CMP #0x58 $E
+    JMP <E> case_6
+    MOV #0x200015A2 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_6
+    CMP #0x58 $E
+    JMP <E> case_6
+    MOV #0x20001642 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_6
+    CMP #0x58 $E
+    JMP <E> case_6
+    JMP <> owins
+case_6:
+    MOV #0x20001504 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_7
+    CMP #0x58 $E
+    JMP <E> case_7
+    MOV #0x200015A4 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_7
+    CMP #0x58 $E
+    JMP <E> case_7
+    MOV #0x20001644 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_7
+    CMP #0x58 $E
+    JMP <E> case_7
+    JMP <> owins
+case_7:
+    MOV #0x20001500 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_8
+    CMP #0x58 $E
+    JMP <E> case_8
+    MOV #0x200015A2 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_8
+    CMP #0x58 $E
+    JMP <E> case_8
+    MOV #0x20001644 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_8
+    CMP #0x58 $E
+    JMP <E> case_8
+    JMP <> owins
+case_8:
+    MOV #0x20001504 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_9
+    CMP #0x58 $E
+    JMP <E> case_9
+    MOV #0x200015A2 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_9
+    CMP #0x58 $E
+    JMP <E> case_9
+    MOV #0x20001640 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_9
+    CMP #0x58 $E
+    JMP <E> case_9
+    JMP <> owins
+case_9:
+    MOV #0x20001500 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_10
+    CMP #0x4F $E
+    JMP <E> case_10
+    MOV #0x20001502 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_10
+    CMP #0x4F $E
+    JMP <E> case_10
+    MOV #0x20001504 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_10
+    CMP #0x4F $E
+    JMP <E> case_10
+    JMP <> xwins
+case_10:
+    MOV #0x200015A0 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_11
+    CMP #0x4F $E
+    JMP <E> case_11
+    MOV #0x200015A2 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_11
+    CMP #0x4F $E
+    JMP <E> case_11
+    MOV #0x200015A4 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_11
+    CMP #0x4F $E
+    JMP <E> case_11
+    JMP <> xwins
+case_11:
+    MOV #0x20001640 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_12
+    CMP #0x4F $E
+    JMP <E> case_12
+    MOV #0x20001642 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_12
+    CMP #0x4F $E
+    JMP <E> case_12
+    MOV #0x20001644 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_12
+    CMP #0x4F $E
+    JMP <E> case_12
+    JMP <> xwins
+case_12:
+    MOV #0x20001500 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_13
+    CMP #0x4F $E
+    JMP <E> case_13
+    MOV #0x200015A0 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_13
+    CMP #0x4F $E
+    JMP <E> case_13
+    MOV #0x20001640 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_13
+    CMP #0x4F $E
+    JMP <E> case_13
+    JMP <> xwins
+case_13:
+    MOV #0x20001502 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_14
+    CMP #0x4F $E
+    JMP <E> case_14
+    MOV #0x200015A2 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_14
+    CMP #0x4F $E
+    JMP <E> case_14
+    MOV #0x20001642 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_14
+    CMP #0x4F $E
+    JMP <E> case_14
+    JMP <> xwins
+case_14:
+    MOV #0x20001504 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_15
+    CMP #0x4F $E
+    JMP <E> case_15
+    MOV #0x200015A4 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_15
+    CMP #0x4F $E
+    JMP <E> case_15
+    MOV #0x20001644 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_15
+    CMP #0x4F $E
+    JMP <E> case_15
+    JMP <> xwins
+case_15:
+    MOV #0x20001500 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_16
+    CMP #0x4F $E
+    JMP <E> case_16
+    MOV #0x200015A2 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_16
+    CMP #0x4F $E
+    JMP <E> case_16
+    MOV #0x20001644 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> case_16
+    CMP #0x4F $E
+    JMP <E> case_16
+    JMP <> xwins
+case_16:
+    MOV #0x20001504 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> nowinner
+    CMP #0x4F $E
+    JMP <E> nowinner
+    MOV #0x200015A2 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> nowinner
+    CMP #0x4F $E
+    JMP <E> nowinner
+    MOV #0x20001640 $A
+    MEMR [1] $A $E
+    CMP #0x20 $E
+    JMP <E> nowinner
+    CMP #0x4F $E
+    JMP <E> nowinner
+    JMP <> xwins
+
+owins:
+    MOV #9 $C
+    MOV #0x20001000 $A
+    MOV #0x4F $F
+    MEMW [1] $F $A
+    MOV #0x57494E53 $F
+    ADD #2 $A
+    MEMW [4] $F $A
+    MOV #0x21 $F
+    ADD #4 $A
+    MEMW [1] $F $A
+    MOV #0x40004000 $A
+    MEMR [1] $A $F
+    ADD #1 $F
+    CMP #58 $F ;58 is the ascii code for the character after 9 (:)
+    JMP <E> reset
+    MEMW [1] $F $A
+    MOV #0x200016B5 $A
+    MEMW [1] $F $A
+skip:
+    MOV #1 $F
+    JMP <> nowin
+
+xwins:
+    MOV #9 $C
+    MOV #0x20001000 $A
+    MOV #0x58 $F
+    MEMW [1] $F $A
+    MOV #0x57494E53 $F
+    ADD #2 $A
+    MEMW [4] $F $A
+    MOV #0x21 $F
+    ADD #4 $A
+    MEMW [1] $F $A
+    MOV #0x40004001 $A
+    MEMR [1] $A $F
+    ADD #1 $F
+    CMP #58 $F
+    JMP <E> reset
+    MEMW [1] $F $A
+    MOV #0x20001705 $A
+    MEMW [1] $F $A
+skip2:
+    MOV #1 $F
+    JMP <> nowin
+
+reset: ;once player reaches 10 points, scores reset both in display and in saved memory
+    MOV #0x30 $F
+    MOV #0x20001705 $A
+    MEMW [1] $F $A
+    MOV #0x40004001 $A
+    MEMW [1] $F $A
+    MOV #0x200016B5 $A
+    MEMW [1] $F $A
+    MOV #0x40004000 $A
+    MEMW [1] $F $A
+    MOV #0x200011E0 $A
+    MOV reset_text $F
+    MOV #37 $C
+ printloop: ;this just prints the reset_text string
+    MEMR [1] $F $G
+    MEMW [1] $G $A
+    ADD #1 $A
+    ADD #1 $F
+    SUB #1 $C
+    CMP #0 $C
+    JMP <LH> printloop
+    MOV #9 $C
+    MOV #1 $G
+    MOV #1 $F
+    JMP <> nowin
+
+nowinner: ;once we determine there is no winner, we either conclude it's a draw, or continue the game
+    CMP #9 $C
+    JMP <LH> nowin ;if 9 turns haven't passed, keep going, jump back to nowin function
+    MOV #0x20001000 $A
+    MOV #0x44524157 $F ;prints DRAW at top corner of screen
+    MEMW [4] $F $A
+    MOV #1 $F
+    JMP <> nowin
+
+instructions:
+    ;this just prints the instructions
+    MOV #0x20001030 $A
+    MOV #0x4B455953 $F
+    MEMW [4] $F $A
+    MOV #0x200010D0 $A
+    MOV #0x515745 $F
+    MEMW [3] $F $A
+    MOV #0x20001120 $A
+    MOV #0x415344 $F
+    MEMW [3] $F $A
+    MOV #0x20001170 $A
+    MOV #0x5A5843 $F
+    MEMW [3] $F $A
+    MOV #0x200016B0 $A
+    MOV #0x4F3A20 $F
+    MEMW [3] $F $A
+    MOV #0x20001700 $A
+    MOV #0x583A20 $F
+    MEMW [3] $F $A
+    MOV #0x40004000 $A
+    MEMR [1] $A $F
+    MOV #0x200016B5 $A
+    MEMW [1] $F $A
+    MOV #0x40004001 $A
+    MEMR [1] $A $F
+    MOV #0x20001705 $A
+    MEMW [1] $F $A
+    RET
+
+vector:
+.dataMemRef clockHandler
+.dataMemRef keyboardHandler
+
+reset_text:
+    .dataAlpha 10 Points Reached. Scores Will Reset.
+
+end:
+
+stack:

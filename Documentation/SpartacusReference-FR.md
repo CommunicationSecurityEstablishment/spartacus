@@ -1,5 +1,5 @@
 ![Spartacus Logo](Images/spartacus-logo.jpg)
-# Manuel de Référence Spartacus
+# Livre de Référence Spartacus
 Version 2.0
 Décembre 2017
 
@@ -10,18 +10,17 @@ Veuillez lire le guide de démarrage rapide avant de lire ce document.
 * Décembre 2018
     * Réécriture complète du document. La version actuelle de la machine virtuelle n'est pas
     compatible avec la première version. L'environnement de jeu a été retiré du projet. Plusieurs
-    instructions ont été ajoutées. Le language a aussi été modifié.
+    instructions ont été ajoutées. Certaines règles concernant la langue ont aussi été modifiés.
     
 ## Introduction
 Capua est un coeur virtuel conçu pour aider les nouveaux venus à la programmation assembleur et
 la programmation de système d'exploitation en général. Capua a été
-développé après avoir constaté une diminution des connaissances relativement
-à la programmation de bas niveau. Ainsi, les fonctionnalités de Capua sont réduites au
-minimum afin que les utilisateurs puissent bénéficier de la simplicité de sa conception 
-dans un contexte d'apprentissage.
+développé après avoir constaté que les nouveaux diplômés en sciences informatique ont subit une diminution d'habiletés 
+en programmation de bas niveau. Ainsi, les fonctions de Capua sont très simples afin que les utilisateurs puissent 
+bénéficier de la simplicité de sa conception dans un contexte d'apprentissage.
 
 ### Note
-À travers ce document, toute référence faite au "matériel", sauf si spécifié, devrait être
+À travers ce document, toute référence faite au "matériel informatique", sauf si spécifié, devrait être
 interprétée comme "matériel virtuel".
 
 ## Capua versus Spartacus
@@ -33,8 +32,8 @@ Spartacus, c'est le projet entier. Capua, c'est l'environnement virtuel.
     * **ACTI, DACTI, HIRET, INT, SFSTOR, SIVR**
     * Celles-ci offrent les fonctionnalités minimalles requises pour le développement de système d'exploitation.
 * Capua comporte maintenant 8 registres à usage général (GPRs):
-    * Cet ajout a forcé un changement au niveau du code machine. Le code construit
-    à l'aide des anciens outils ne fonctionnera pas correctement sur Capua V. 2.0.
+    * Cet ajout a forcé un changement au niveau du code de machine. Un code construit
+    à l'aide des anciens outils ne pourra fonctionner correctement sur Capua V. 2.0.
 * Le support pour plusieurs pièces de matériel a été ajouté:
     * Disque rigide, horloge d'intérruption et Terminal.
 * Les éléments matériels qui étaient fortement liés à l'environnement de jeu ont été retirés.
@@ -56,7 +55,7 @@ drapeaux est nommé **FLAGS** et n’est pas non plus
 accessible aux utilisateurs.
 
 ## Mémoire
-À l'heure actuelle, aucun mécanisme de gestion de la mémoire n'est disponible.
+En ce moment, aucun mécanisme de gestion de la mémoire n'est disponible.
 C'est un des éléments sur lesquels nous travaillons. Un tel système devrait être
 disponible dans une version ultérieure.
 La mémoire physique est donc accédée directement. Le début de la mémoire utilisateur
@@ -64,8 +63,8 @@ est défini à l'intérieur du fichier **Configuration/Configuration.py**. Par d
 cette valeur est 0x40000000. Aussi par défaut, la machine virtuelle possède 1Mo de mémoire.
 Ces valeurs peuvent être modifiées mais il est recommandé de conserver les valeurs par défaut.
 ## Dispositifs mappés en mémoire
-Sur capua, l'ensemble du matériel est mappé en mémoire. Chaque élément peut être 
-accédé à partir d'une address situé sous l'addresse de début de la mémoire (0x40000000).
+Sur capua, l'ensemble du matériel est assigné en mémoire. Chaque élément peut être 
+accédé à partir d'une addresse situé sous l'addresse de début de la mémoire (0x40000000).
 La présence de ce matériel est une des raison pour lesquelles ils n'est pas recommandé 
 de modifier la configuration de la mémoire.
 ## Architecture générale
@@ -75,26 +74,25 @@ En date de décembre 2017 l'architecture Capua ressemble à ceci:
 Comme vous pouvez le voir, l'architecture est très simple mais semblable à celle d'un 
 ordinateur réel.
 
-# Jeu d'instructions
-La syntaxe du language assembleur Capua est organisée sur le modèle source -> destination.
-Quand deux éléments sont présents dans une instruction, valeur immédiate ou registre, le
-premier élément est toujours la source alors que le deuxième est toujours la destination.
-L'ensemble du jeu d'instructions du language Capua sera maintenant présenté.
+# Liste d'instructions
+La syntaxe du language assembleur Capua est organisée d'après le modèle source -> destination.
+Lorsque deux éléments sont présents dans une instruction, une valeur immédiate, ou un registre, le
+premier élément est toujours la source tandis que le deuxième est toujours la destination.
+L'ensemble des instructions du language Capua sera maintenant présenté.
 ###### Régistres, valeurs immédiate et références mémoires
 L'assembleur demande que le programmeur utilise le préfixe **$** devant un registre. Le préfixe
-**#** doit quant à lui être utilisé devant une valeur immédiate. L'utilisation d'un libéllé
+**#** doit quant à lui être utilisé devant une valeur immédiate. L'utilisation d'une étiquette
 de référence mémoire est permise à l'intérieur des instructions utilisant des valeurs immédiates.
-Il n'est cependant pas requis de leur appliquer de préfixe.
+Il n'est cependant pas requis de leur donner un préfixe.
 ### ACTI
-Cette instruction active les mécanisme de gestion des intérruptions. Après que cette
-instruction ait été exécutée, l'instruction INT ainsi que les intérruptions matérielles
+Cette instruction permet d'activer le mécanisme de gestion des intérruptions. Une fois l'instruction activée, 
+l'instruction INT ainsi que les intérruptions matérielles
 peuvent être transmises à l'unité d'exécution. La gestion des intérruptions est décrite
 à la section appropriée. L'instruction ACTI n'utilise aucun registre ou valeur immédiate.
 >**ACTI**
 ### ADD
 Cette instruction permet l’addition de nombres
-entiers. Les diverses
-variantes de l’instruction d’addition sont présentées ci-dessous.
+entiers. Les différentes utilisations de l’instruction d’addition sont présentées ci-dessous.
 >**ADD #0xFF $A**
 
 >**ADD $B $A**
@@ -108,7 +106,7 @@ la table de vérité AND normale:
 * 0 and 1 = 0
 * 0 and 0 = 0
 
-Cette vérification est étendue à toute
+Cette vérification est prolongée à toute
 la longueur des éléments comparés (32 bits)
 >**AND #0xFF $A**
 
@@ -132,10 +130,10 @@ comme adresse de retour.
 >**CALL testFunction**
 ### CMP
 L’instruction de comparaison est la seule qui permet
-la modification du registre FLAGS . À l’heure actuelle,
+la modification du registre FLAGS . En ce moment,
 le registre FLAGS possède uniquement trois bits. Le bit
 supérieur (0b100) est activé lorsque l’élément
-source de la comparaison correspondra à l’élément
+source de la comparaison équivaut l’élément
 de destination. Le bit central (0b010) est activé
 lorsque la source est inférieure à la destination et le
 bit le plus à droite (0b001) est activé lorsque la
@@ -157,7 +155,7 @@ registre B .
 >**DIV $C $B**
 ### HIRET
 L'instruction HIRET signifie "Hardware Interrupt Return". Cette instruction
-doit être utilisée comme instruction de retour par les routine de gestion d'intérruptions
+doit être utilisée comme instruction de retour par les routines de gestion d'intérruptions
 matérielles. Elle ne doit pas être utilisée par les routines de gestion d'intérruptions logicelles.
 Lorsque l'instruction est exécutée, le contrôle d'exécution retournera au code intérrompu tout
 en s'assurant que la valeur que portait le registre FLAGS sera conservé au moment du retour.
@@ -174,7 +172,7 @@ Cette instruction existe en deux variantes. Elle peut utiliser une valeur imméd
 >**INT $A**
 ### JMP
 L’instruction de saut permet de sauter, de manière
-conditionnelle ou non, des parties du code en
+conditionnelle ou non, à un endroit spécifié du code en
 consultant la valeur du registre FLAGS . Cette
 instruction est particulière, car elle utilise un drapeau
 indicateur pour permettre à l’utilisateur de choisir les
@@ -192,7 +190,7 @@ pour établir des conditions complexes. Par exemple,
 l’indicateur <LE> pourrait permettre au saut d’avoir
 lieu si le drapeau E ou le drapeau L est activé.
 Veuillez noter que la valeur immédiate ou le registre
-utilisés par cette instruction doit posséder une
+utilisé par cette instruction doit posséder une
 adresse mémoire valide pointant vers une instruction.
 >**JMP <E\> #0x40000010**
 
@@ -230,7 +228,7 @@ En raison de sa nature, l’instruction MEMW est
 disponible en un nombre de variantes supérieur à
 celui de l’instruction MEMR. La destination peut être
 un registre ou une valeur immédiate, mais il doit
-s’agir d’une adresse mémoire valide.
+s’agir d’une adresse de mémoire valide.
 >**MEMW \[4\] #0xFF #0x40000000**
 
 >**MEMW \[4\] #0xFF $A**
@@ -266,7 +264,7 @@ démarrage afin de faciliter le développement.
 L’instruction NOT inversera les bits d’un registre. Par
 exemple, si le registre A est égal à 0x01 avant
 l’instruction NOT , il sera égal à 0xFFFFFFFE après
-l’instruction NOT . L'instruction, est utulisable uniquement avec un registre.
+l’instruction NOT . L'instruction, s'utilise uniquement avec un registre.
 >**NOT $A**
 ### OR
 L’instruction OR est une opération OU binaire. Elle travaille suivant les règles
@@ -288,7 +286,7 @@ données qui étaient en haut de la pile seront
 disponibles dans le registre précisé par l’instruction
 POP . Pour que l’instruction POP soit utilisée de
 manière sécuritaire, le pointeur de pile S doit être
-réglé à une adresse mémoire valide.
+réglé à une adresse de mémoire valide.
 >**POP $A**
 ### PUSH
 L’instruction PUSH ajoutera une valeur de 32 bits sur
@@ -451,7 +449,7 @@ Par exemple, chaque partie d'une instruction doit
 
 >**MOV $A $B ;This is fine**
 
-De toute évidence, bon nombre de ces problèmes sont faciles
+De toute évidence, un bon nombre de ces problèmes sont faciles
 à corriger. N'hésitez pas à vous impliquer et à contribuer.
 
 Lors de l'assemblage, le fichier d'entrée est
@@ -466,7 +464,7 @@ données binaires. Ce format n'est pas parfait et sera modifié dans le futur.
 Une description complète de ce format est disponible plus bas dans ce document.
 
 ##### Écriture du code assembleur
-Cette partie se concentre non pas sur le code mais
+Cette partie ne se concentre pas sur le code, mais
 sur les directives de l'assembleur. Ces directives doivent
 être utilisées lors de l'écriture de code.
 
@@ -509,35 +507,35 @@ sur les directives de l'assembleur. Ces directives doivent
     **.dataAlpha This is a test string**
     *Notez qu'aucun commentaire ne peut suivre cette ligne.*
 * ".dataMemRef"
-    * Ceci est similaire à .dataNumeric à l'exception
+    * Ceci est semblable à .dataNumeric, sauf 
     qu'un programmeur peut spécifier une référence en mémoire.
     Lorsque l'édition des liens est faite, la référence mémoire
     sera remplacée par son adresse.
     Cette directive est principalement utilisée afin
-    de permettre la création de vecteur d'intérruption.
+    de permettre la création de vecteurs d'intérruption.
     La directive est utilisée de cette manière: **.dataMemref referenceMemoire**
 * ".dataNumeric"
     * C’est la même chose que .dataAlpha sauf que
-    cela permet au programmeur d’utiliser des
+    celui-ci permet au programmeur d’utiliser des
     valeurs numériques de 32 bits. Exemple
     d’utilisation :
     **.dataNumeric 0xFFFFFFFF**
 * "$"
-    * Est le préfixe de registre. Chaque registre,
+    * Utilisé comme préfixe de registre. Chaque registre,
     lorsqu’il est utilisé dans une instruction, 
     doit être précédé par le caractère
     "$".
 * "#"
-    * Est le préfixe de valeur immédiate. Chaque
+    * Utilisé comme préfixe de valeur immédiate. Chaque
     valeur immédiate (sauf lors de l’utilisation
     d’un symbole) doit être précédée par le
     caractère "#".
-    De multiples variantes sont possibles pour les
-    valeurs immédiates :
+    Les valeurs immédiates peuvent être écrits de plusieurs facons :
     \#0xFF
     \#255
     \#-1
     \#0b11111111
+    
 
 ##### Exemple: programme court
 Voici un exemple de programme qui permet de calculer la 
@@ -586,13 +584,12 @@ Afin d'assembler ce fichier, vous pouvez utiliser la commande suivante:
 > python3 Assembler.py -i strlen.casm -o strlen.o
 
 Vous pouvez obtenir de l'aide au sujet de l'assembleur en utilisant l'option "-h" lorsque
-vous lancer l'assembleur.
+vous lancez l'assembleur.
 
 ## Linker.py
 ##### Survol
 Capua possède également son propre éditeur de
-liens. Cet éditeur de liens est destiné à être utilisé
-pour aider à la création de fichiers binaires plats.
+liens. Cet éditeur de liens aide à créer des fichiers binaires plats.
 L’éditeur de liens peut lier plusieurs fichiers.
 Étant donné que les fichiers binaires produits par
 l’éditeur de liens sont destinés à être utilisés
@@ -601,7 +598,7 @@ Toutes les adresses, suivant l'édition des liens,
 sont codées en dur dans le fichier binaire résultant.
 Cela signifie que l’éditeur de liens a besoin de
 connaître, au moment de l’établissement de liens,
-l’adresse mémoire où le fichier binaire doit être
+l’adresse de mémoire où le fichier binaire doit être
 chargé. Si l’adresse de chargement n’est pas fournie,
 le fichier binaire lié est chargé à l’adresse
 MEMORY_START_AT (la valeur par défaut est
@@ -666,9 +663,9 @@ Afin de lancer le fichier binaire créé plus tôt, vous pouvez utiliser la comm
 > python3 Debugger.py -i main.bin
 
 ##### Note importante au sujet du processus de démarrage virtuel
-Si le débogueur est lancé sans aucun paramètre. Celui-ci utilisera le code du "firmware" présent
+Si le débogueur est lancé sans aucun paramètre, il utilisera le code du "firmware" présent
 dans le fichier CapuaEnvironment/firmware.bin. Pour que ceci fonctionne, le fichier CapuaEnvironment/firmware.casm
-doit être assemblé puis lié afin de créer le fichier binaire final. Ce fichier, lorsque chargé
+doit être assemblé et ensuite lié afin de créer le fichier binaire final. Ce fichier, lorsque chargé
 tentera d'effectuer une validation du disque rigide. Si cette validation fonctionne, le
 premier secteur du disque rigide sera chargé à l'addresse MEMORY_START_AT (valeur par défaut 0x40000000)
 et commencera l'exécution du code nouvellement chargé. Ceci a pour objectif de simuler le
@@ -680,7 +677,7 @@ C'est outil est simplement un outil d'aide visant à générer un fichier binair
 vide d'une taille acceptable pour la machine virtuelle. L'outil procédera à la validation
 de la configuration de la machine virtuelle afin de créer un fichier de la bonne taille.
 Par défault, un fichier de 1Mo est créé.
-La machine, afin de fonctionne correctement, demmande la présence d'un fichier HD.bin à la
+La machine, afin de fonctionner correctement, demmande la présence d'un fichier HD.bin à la
 racine du projet. Vous pouvez générer ce fichier à l'aide de la commande:
 > python3 HardDriveCreator.py -o HD.bin
 
@@ -690,7 +687,7 @@ de la machine virtuelle (que le "firmware" soit utilisé ou non)
 # Gestion des intérruptions sur Capua
 
 Capua permet de gérer les interruptions à partir de sources matérielles et logicielles.
-Pour que les intérruptions soient traitées, la gestion des interruptions doit d'abord être activée. 
+Pour que les intérruptions soient traitées, la gestion des interruptions doit premièrement être activée. 
 Lorsque la machine virtuelle démarre,
 la gestion des interruptions est désactivée. 
 On peut activer la gestion des interruptions en utilisant l'instruction suivante
@@ -705,7 +702,7 @@ vers un vecteur de pointeurs sur des routines de gestion des intérruptions.
 Chaque interruption matérielle est associée à une valeur numérique 
 (les interruptions logicielles spécifient leur propre valeur).
 Lorsqu'une interruption matérielle se produit, la gestion des interruptions 
-est désactivée et l'exécution reprend à la routine de gestion d'interruptions 
+est désactivée et l'exécution reprend la routine de gestion d'interruptions 
 correspondant à un numéro d'interruption. Le processus est semblable pour 
 les interruptions logicielles. Cependant, le traitement des interruptions n'est 
 pas désactivé lors de la gestion d'une interruption logicielle. Ceci permet au système de 
@@ -720,18 +717,18 @@ Routine est l'address à laquelle l'adresse de la routine de gestion appropriée
 Routine = Vecteur + (IN * 4)
 ```
 
-Il est de la plus haute importance que le programmeur comprenne que, pendant la gestion
+Il est d'importance majeure que le programmeur comprenne que, pendant la gestion
 d'une interruption matérielle, toutes les interruptions sont désactivées sur le système. 
 La plupart des périphériques sur Capua utiliseront une cache afin de conserver
 les intérruptions et pouvoir les livrer plus tard. Cependant, ceci n'est pas garanti.
 Certaines interruptions peuvent être perdues si l'exécution demeure
 à l'intérieur d'une routine de gestion des interruptions trop longtemps. 
-à la fin de la routine de gestion, dans le cas d'une interruption matérielle, 
+À la fin de la routine de gestion, dans le cas d'une interruption matérielle, 
 une instruction de retour spéciale doit être utilisée:
 >HIRET
 
 
-L'instruction HIRET fait un peu plus que simplement permettre le retour. 
+L'instruction HIRET ne permet pas tout simplement d'effectuer un retour. 
 Elle réactive également la gestion des interruptions sur le noyau et s'assure 
 que le registre FLAGS est réinitialisé à la même valeur qu'il était avant l'arrivée
 de l'intérruption. 
@@ -741,7 +738,7 @@ des interruptions logicielles.
 Le retour d'une d'une intérrruption logicielle est faite, comme un retour de fonction, en utilisant
 l'instruction "RET".
 ##### Configuration des intérruptions
-Sur Capua, à l'heure actuelle, seuls les 4 premiers vecteurs d'interruptions sont utilisés. 
+Sur Capua, en ce moment, seuls les 4 premiers vecteurs d'interruptions sont utilisés. 
 Les vecteurs 0 à 31 devraient tous être considérés comme réservés. 
 Un gestionnaire d'intérruptions logicielles ne doit donc pas les utiliser. Voici la
 la cartographie d'interruption actuelle:
@@ -756,7 +753,7 @@ la cartographie d'interruption actuelle:
     * L'intérruption 3 est générée par le disque rigide quand une opération d'écriture est terminée
 
 ###### Note importante:
-On pourrait ne pas comprendre pourquoi un programmeur doit mettre
+Il est possible qu'un programmeur ait besoin de mettre
 en place un gestionnaire d'interruptions logicielles à la palce de simplement utiliser
 des appels de fonction. Après tout, il n'y a pas de différence, ou presque, entre une
 interruption logicielle et un appel de fonction. 
@@ -816,7 +813,7 @@ end:
 # Matériel mappé en mémoire
 La machine virtuelle supporte le matériel mappé en mémoire. 
 Le matériel mappé en mémoire est
-accessible à l'aide d'adresses mémoire spécifiques. 
+accessible à l'aide d'adresses de mémoire spécifiques. 
 La façon dont chaque élément matériel doit être utilisé est
 spécifique à chaque appareil.
 
@@ -825,8 +822,8 @@ spécifique à chaque appareil.
 Adresse de mappage: 0x20000100
 Opération permise: Lecture
 ```
-L'horloge a pour objectif d'offrir une source d'entropie à l'utilisateur. 
-et non pas pour fournir l'heure à l'utilisateur. 
+L'horloge a comme but d'offrir une source d'entropie à l'utilisateur, 
+et non pour fournir l'heure à l'utilisateur. 
 La lecture de 4 octets à l'adresse mappée fournira une valeur
 basé sur le code python suivant:
 >int((time.time() * 10000000)) & 0xFFFFFFFF
@@ -862,9 +859,9 @@ Adresse de mappage: 0x20000400
 Opération permise: Lecture/Écriture
 ```
 
-Un élément important doit être noté. Le disque dur lui-même n'est pas 
+Un élément important doit être noté: le disque dur lui-même n'est pas 
 cartographié à l'adresse de mappage. C'est le contrôleur du disque dur qui
-est mappé sur cette addresse.
+est mappé à cette addresse.
 C'est celui-ci qui est utilisé pour accéder au disque dur.
 
 Pour pouvoir accéder au disque, une structure spécifique doit être écrite à 
@@ -962,14 +959,14 @@ codeStart:
 Afin de fonctionner, le clavier demande que la gestion des intérruptions soit
 configurée et activée. Lorsque l'utilisateur appuie sur une touche du clavier,
 une intérruption de clavier est générée et le contrôle est transféré à la routine
-de gestion d'intérruption du clavier. À ce moment le code de lecture (attention, code 
+de gestion d'intérruption du clavier. À ce moment le code de lecture (attention: code 
 de lecture et non pas code ascii) pour la touche activée est disponible à la lecture
 à l'adresse 0x20001800.
 Dans l'éventualité où une intérruption du clavier ne peut être livrée à l'unité
 d'exécution, le clavier possède une mémoire tampon pouvant contenir un maximum
 de 20 codes de lecture. L'intérruption sera donc livrée à un moment ultérieur.
 Dans le cas où la mémoire du clavier est pleine avant que l'intérruption soit
-livrée, les code les plus vieux seront éliminés de la mémoire du clavier.
+livrée, les codes les plus vieux seront éliminés de la mémoire du clavier.
 
 L'exemple de code suivant montre comment lire le code de lecture d'une touche
 à l'intérieur d'une routine de gestion d'intérruption pour le clavier.
@@ -1006,11 +1003,11 @@ end:
 ```
 ## Format de fichier ".o" de Capua
 Le format de fichier Capua est très simple. Pour des raisons évidents,
-des "bugs" sont associés au format lui-même. Ces problèmes seront résolut
+des "bugs" sont associés au format lui-même. Ces problèmes seront résolus
 lorsque le format de fichier sera remplacé. Pour l'instant, le format
 fonctionne correctement dans la majorité des cas.
 
-En voici la forme générale:
+Voici la forme générale:
 
 ```
 <AssemblySize></AssemblySize>
@@ -1054,7 +1051,7 @@ faisant parti du format de fichier.
     que les symboles énumérés dans cette balise ne
     sont pas accessibles à l’éditeur de lien au moment
     de lier plusieurs fichiers. Ceci a
-    pour but de prévenir les problèmes de collision de
+    comme but de prévenir les problèmes de collision de
     noms à l’échelle globale (externe) au moment de
     la liaison.
 * refName
@@ -1071,7 +1068,7 @@ faisant parti du format de fichier.
     simplement le décalage où le symbole se
     trouve à partir de l’adresse 0 (par rapport au début
     du fichier). Notez que le décalage est relatif à un
-    fichier entièrement relié, pas à un fichier objet (.o).
+    fichier entièrement relié, et non à un fichier objet (.o).
     Cette adresse remplace éventuellement le nom de
     symbole lorsque le fichier est relié.
 * Text

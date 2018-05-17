@@ -28,6 +28,14 @@ from Configuration.Configuration import REGISTER_A, \
                                         REGISTER_E, \
                                         REGISTER_F, \
                                         REGISTER_G, \
+                                        REGISTER_H, \
+                                        REGISTER_J, \
+                                        REGISTER_K, \
+                                        REGISTER_L, \
+                                        REGISTER_M, \
+                                        REGISTER_N, \
+                                        REGISTER_O, \
+                                        REGISTER_P, \
                                         REGISTER_S, \
                                         DEBUGGER_WAKEUP_TICK_COUNT
 
@@ -328,6 +336,22 @@ class Debugger:
             result = "F"
         elif numericRegister == REGISTER_G:
             result = "G"
+        elif numericRegister == REGISTER_H:
+            result = "H"
+        elif numericRegister == REGISTER_J:
+            result = "J"
+        elif numericRegister == REGISTER_K:
+            result = "K"
+        elif numericRegister == REGISTER_L:
+            result = "L"
+        elif numericRegister == REGISTER_M:
+            result = "M"
+        elif numericRegister == REGISTER_N:
+            result = "N"
+        elif numericRegister == REGISTER_O:
+            result = "O"
+        elif numericRegister == REGISTER_P:
+            result = "P"
         elif numericRegister == REGISTER_S:
             result = "S"
 
@@ -348,6 +372,14 @@ class Debugger:
         self.debugLog("{} = {}  {}".format("E    ", self.capua.eu.E, hex(self.capua.eu.E),))
         self.debugLog("{} = {}  {}".format("F    ", self.capua.eu.F, hex(self.capua.eu.F),))
         self.debugLog("{} = {}  {}".format("G    ", self.capua.eu.G, hex(self.capua.eu.G),))
+        self.debugLog("{} = {}  {}".format("H    ", self.capua.eu.H, hex(self.capua.eu.H),))
+        self.debugLog("{} = {}  {}".format("J    ", self.capua.eu.J, hex(self.capua.eu.J),))
+        self.debugLog("{} = {}  {}".format("K    ", self.capua.eu.K, hex(self.capua.eu.K),))
+        self.debugLog("{} = {}  {}".format("L    ", self.capua.eu.L, hex(self.capua.eu.L),))
+        self.debugLog("{} = {}  {}".format("M    ", self.capua.eu.M, hex(self.capua.eu.M),))
+        self.debugLog("{} = {}  {}".format("N    ", self.capua.eu.N, hex(self.capua.eu.N),))
+        self.debugLog("{} = {}  {}".format("O    ", self.capua.eu.O, hex(self.capua.eu.O),))
+        self.debugLog("{} = {}  {}".format("P    ", self.capua.eu.P, hex(self.capua.eu.P),))
         self.debugLog("{} = {}  {}".format("S    ", self.capua.eu.S, hex(self.capua.eu.S),))
         self.debugLog("{} = {}  {}".format("I    ", self.capua.eu.I, hex(self.capua.eu.I),))
         self.debugLog("{} = {}  {}".format("FLAGS", self.capua.eu.FLAGS, bin(self.capua.eu.FLAGS),))

@@ -31,6 +31,14 @@ from Configuration.Configuration import REGISTER_A, \
                                         REGISTER_E, \
                                         REGISTER_F, \
                                         REGISTER_G, \
+                                        REGISTER_H, \
+                                        REGISTER_J, \
+                                        REGISTER_K, \
+                                        REGISTER_L, \
+                                        REGISTER_M, \
+                                        REGISTER_N, \
+                                        REGISTER_O, \
+                                        REGISTER_P, \
                                         REGISTER_S, \
                                         MEMORY_END_AT, \
                                         MEMORY_START_AT
@@ -60,6 +68,14 @@ class ExecutionUnit:
     E = 0           # Software limited to 32 bits General purpose register
     F = 0           # Software limited to 32 bits General purpose register
     G = 0           # Software limited to 32 bits General purpose register
+    H = 0           # Software limited to 32 bits General purpose register
+    J = 0           # Software limited to 32 bits General purpose register
+    K = 0           # Software limited to 32 bits General purpose register
+    L = 0           # Software limited to 32 bits General purpose register
+    M = 0           # Software limited to 32 bits General purpose register
+    N = 0           # Software limited to 32 bits General purpose register
+    O = 0           # Software limited to 32 bits General purpose register
+    P = 0           # Software limited to 32 bits General purpose register
     S = 0           # Software limited to 32 bits Stack pointer. Can be used as a GPR is not using the stack
     I = 0           # Software limited to 32 bits Instruction pointer. This one is not accessible from instructions
     FLAGS = 0b000   # 3 bits limited ZLH = Zero, Lower, Higher
@@ -132,6 +148,14 @@ class ExecutionUnit:
         self.E = 0
         self.F = 0
         self.G = 0
+        self.H = 0
+        self.J = 0
+        self.K = 0
+        self.L = 0
+        self.M = 0
+        self.N = 0
+        self.O = 0
+        self.P = 0
         self.I = I
         self.IS = 0
         self.IVR = 0
@@ -194,6 +218,22 @@ class ExecutionUnit:
             self.F = value
         elif registerCode == REGISTER_G:
             self.G = value
+        elif registerCode == REGISTER_H:
+            self.H = value
+        elif registerCode == REGISTER_J:
+            self.J = value
+        elif registerCode == REGISTER_K:
+            self.K = value
+        elif registerCode == REGISTER_L:
+            self.L = value
+        elif registerCode == REGISTER_M:
+            self.M = value
+        elif registerCode == REGISTER_N:
+            self.N = value
+        elif registerCode == REGISTER_O:
+            self.O = value
+        elif registerCode == REGISTER_P:
+            self.P = value
         elif registerCode == REGISTER_S:
             self.S = value
         else:
@@ -220,6 +260,22 @@ class ExecutionUnit:
             register = self.F
         elif registerCode == REGISTER_G:
             register = self.G
+        elif registerCode == REGISTER_H:
+            register = self.H
+        elif registerCode == REGISTER_J:
+            register = self.J
+        elif registerCode == REGISTER_K:
+            register = self.K
+        elif registerCode == REGISTER_L:
+            register = self.L
+        elif registerCode == REGISTER_M:
+            register = self.M
+        elif registerCode == REGISTER_N:
+            register = self.N
+        elif registerCode == REGISTER_O:
+            register = self.O
+        elif registerCode == REGISTER_P:
+            register = self.P
         elif registerCode == REGISTER_S:
             register = self.S
         else:

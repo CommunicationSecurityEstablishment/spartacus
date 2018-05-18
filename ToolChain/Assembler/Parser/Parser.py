@@ -30,6 +30,14 @@ from Configuration.Configuration import REGISTER_A, \
                                         REGISTER_E, \
                                         REGISTER_F, \
                                         REGISTER_G, \
+                                        REGISTER_H, \
+                                        REGISTER_J, \
+                                        REGISTER_K, \
+                                        REGISTER_L, \
+                                        REGISTER_M, \
+                                        REGISTER_N, \
+                                        REGISTER_O, \
+                                        REGISTER_P, \
                                         REGISTER_S
 from ToolChain.Assembler.Constants import REGISTER_PREFIX, \
                                           IMMEDIATE_PREFIX, \
@@ -224,6 +232,22 @@ class Parser:
             registerCode = REGISTER_F
         elif registerName == "G":
             registerCode = REGISTER_G
+        elif registerName == "H":
+            registerCode = REGISTER_H
+        elif registerName == "J":
+            registerCode = REGISTER_J
+        elif registerName == "K":
+            registerCode = REGISTER_K
+        elif registerName == "L":
+            registerCode = REGISTER_L
+        elif registerName == "M":
+            registerCode = REGISTER_M
+        elif registerName == "N":
+            registerCode = REGISTER_N
+        elif registerName == "O":
+            registerCode = REGISTER_O
+        elif registerName == "P":
+            registerCode = REGISTER_P
         elif registerName == "S":
             registerCode = REGISTER_S
         else:

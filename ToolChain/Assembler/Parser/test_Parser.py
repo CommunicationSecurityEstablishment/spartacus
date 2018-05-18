@@ -988,6 +988,14 @@ class TestParser(unittest.TestCase):
         self.assertEqual(0b100, self.parser.translateRegisterNameToRegisterCode(registerName="E"))
         self.assertEqual(0b101, self.parser.translateRegisterNameToRegisterCode(registerName="F"))
         self.assertEqual(0b110, self.parser.translateRegisterNameToRegisterCode(registerName="G"))
+        self.assertEqual(0b111, self.parser.translateRegisterNameToRegisterCode(registerName="H"))
+        self.assertEqual(0b1000, self.parser.translateRegisterNameToRegisterCode(registerName="J"))
+        self.assertEqual(0b1001, self.parser.translateRegisterNameToRegisterCode(registerName="K"))
+        self.assertEqual(0b1010, self.parser.translateRegisterNameToRegisterCode(registerName="L"))
+        self.assertEqual(0b1011, self.parser.translateRegisterNameToRegisterCode(registerName="M"))
+        self.assertEqual(0b1100, self.parser.translateRegisterNameToRegisterCode(registerName="N"))
+        self.assertEqual(0b1101, self.parser.translateRegisterNameToRegisterCode(registerName="O"))
+        self.assertEqual(0b1110, self.parser.translateRegisterNameToRegisterCode(registerName="P"))
         self.assertEqual(0b1111, self.parser.translateRegisterNameToRegisterCode(registerName="S"))
         self.assertRaises(ValueError, self.parser.translateRegisterNameToRegisterCode, "x")  # Invalid register
 

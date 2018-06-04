@@ -135,12 +135,12 @@ class Parser:
             lineNo += 1
 
             try:
-                raw_line = line
+                rawLine = line
                 line = line.split()
                 if len(line) > 0:
                     # If we make it here, there was something on the line
                     # We move to the next step and parse the line to get the appropriate code for what's written
-                    buildInstruction, lineInstruction = self._parseCodeLine(line, raw_line)
+                    buildInstruction, lineInstruction = self._parseCodeLine(line, rawLine)
 
                     if buildInstruction is not None:
                         # There was a valid instruction or memory reference on the line
@@ -161,7 +161,7 @@ class Parser:
 
         return instructionList, memoryReferenceDict, relativeAddressCounter
 
-    def _parseCodeLine(self, line: list=None, raw_line: str=None):
+    def _parseCodeLine(self, line: list=None, rawLine: str=None):
         """
         This will parse an extracted line of code and build an instruction from that code line
         Parsing a line of code requires many steps.
@@ -175,7 +175,7 @@ class Parser:
                 program.
 
         :param line:
-        :param raw_line
+        :param rawLine
         :return:
         """
 
@@ -186,7 +186,7 @@ class Parser:
         possibleCodes = None
 
         # We evaluate the line and extract any bits of relevant info to build the appropriate instruction
-        self._evaluateAndExtractInfoFromLine(line, buildInstruction, raw_line)
+        self._evaluateAndExtractInfoFromLine(line, buildInstruction, rawLine)
 
         if type(buildInstruction.instructionCode) is not str:
             # We assume it's an instruction (integer), since memory references or comments would be strings
@@ -234,7 +234,7 @@ class Parser:
 
         return buildInstruction, lineInstruction
 
-    def _evaluateAndExtractInfoFromLine(self, line, buildInstruction, raw_line):
+    def _evaluateAndExtractInfoFromLine(self, line, buildInstruction, rawLine):
         """
         This is a helper method. The aim to this is to keep caller code cleaner
         Method evaluates each part of the line to determine whether we're dealing with an instruction, label, data, etc.
@@ -245,9 +245,10 @@ class Parser:
         invalid instruction.
         :param line:
         :param buildInstruction:
-        :param raw_line
+        :param rawLine
         :return:
         """
+
 
         foundSource = False                              # Flag for whether we found a source immediate or register
         foundDestination = False                         # Flag for whether we found a destination immediate or register
@@ -261,12 +262,18 @@ class Parser:
         buildInstruction.operationMnemonic = line[0].upper()
 
         # PART 1: Evaluate the first part of the line, look for items that aren't instructions (labels, memref, etc)
-        if (MEMORY_REFERENCE_INDICATORS == line[0][-1]) or COMMENT_INDICATORS == line[0][0]:
-            # If the end of the first line's word is a color ":" or the beginning is a semicolon ";"
-            # we assume it's a memory reference or a comment. Thus, there's no code and we can simply return.
+
+        if COMMENT_INDICATORS == line[0][0]:
             # We keep the comment indicator so we can later discard the instruction.
-            # We put the text into instructionCode since this is an impossible case,
-            # and put in some indicator for the linker.
+            buildInstruction.instructionCode = line[0].upper()
+            return
+
+        if MEMORY_REFERENCE_INDICATORS == line[0][-1]:
+            # This line is a memory label, keep it intact for now. Offsets for these symbols will be generated later
+            # Verify this label doesn't have additonal ':', hotfix for issue 18
+            if line[0].count(':') > 1:
+                raise ValueError("Syntax error, memory reference has too many {}".format(MEMORY_REFERENCE_INDICATORS))
+
             buildInstruction.instructionCode = line[0].replace(MEMORY_REFERENCE_INDICATORS, "").upper()
 
             return
@@ -274,7 +281,7 @@ class Parser:
         if buildInstruction.operationMnemonic in indicator_list:
             # If the first argument of the line isn't an instruction, memory reference, or comment,
             # it could be an indicator
-            self._parseIndicatorData(line, buildInstruction, raw_line)
+            self._parseIndicatorData(line, buildInstruction, rawLine)
             return
 
         # PART 2: Evaluate arguments
@@ -339,18 +346,27 @@ class Parser:
                     part = part[1:]
                 if not foundSource:
                     foundSource = True
+
+                    # Verify this reference doesn't have additonal ':', hotfix for issue 18
+                    if part.count(':') > 0:
+                        raise ValueError("Syntax error, memory reference has too many {}".format(MEMORY_REFERENCE_INDICATORS))
                     buildInstruction.sourceImmediate = MEMORY_REFERENCE_INDICATORS + part.upper() + \
                                                        MEMORY_REFERENCE_INDICATORS
+                    
                 else:
                     if foundDestination:
                         raise ValueError("Invalid operation format")
                     foundDestination = True
+
+                    # Verify this label doesn't have additonal ':', hotfix for issue 18
+                    if part.count(':') > 0:
+                        raise ValueError("Syntax error, memory reference has too many {}".format(MEMORY_REFERENCE_INDICATORS))
                     buildInstruction.destinationImmediate = MEMORY_REFERENCE_INDICATORS + part.upper() + \
                                                             MEMORY_REFERENCE_INDICATORS
 
                 continue
 
-    def _parseIndicatorData(self, line, buildInstruction, raw_line):
+    def _parseIndicatorData(self, line, buildInstruction, rawLine):
         '''
         Helper method to segregate the evaluateAndExtractInfoFromLine method's operations.
         This is called if the first argument of a line isn't an instruction. Cases could be:
@@ -360,7 +376,7 @@ class Parser:
         -.dataAlpha, .dataNumeric, or .dataMemref
         :param line:
         :param buildInstruction:
-        :param raw_line
+        :param rawLine
         :return:
         '''
 
@@ -385,8 +401,8 @@ class Parser:
             # We need to rebuild the alpha into a byte string to be read by the VM
             # We want to preserve spaces in the original string, so we limit the split to the first argument
 
-            raw_line = raw_line.split(maxsplit=1)
-            alpha = b"" + raw_line[1].encode("utf-8") + b" "
+            rawLine = rawLine.split(maxsplit=1)
+            alpha = b"" + rawLine[1].encode("utf-8") + b" "
             alpha = alpha[0:-1]  # Remove trailing space
             alpha += b"\x00"  # Strings are null terminated
             buildInstruction.sourceImmediate = alpha

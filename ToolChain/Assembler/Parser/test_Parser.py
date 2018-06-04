@@ -961,7 +961,7 @@ class TestParser(unittest.TestCase):
         self.assertEqual(buildInstruction.destinationImmediate, None)
         self.assertEqual(buildInstruction.width, None)
         self.assertEqual(buildInstruction.flags, None)
-        self.assertEqual(buildInstruction.operationMnemonic, None)
+        self.assertEqual(buildInstruction.operationMnemonic, "TEST:")
         self.assertEqual(buildInstruction.instructionLength, None)
 
         # MEMR using address indicator
@@ -1032,7 +1032,7 @@ class TestParser(unittest.TestCase):
         _evaluateAndExtractInfoFromLine(self, line, buildInstruction)
         """
         buildInstruction = Instruction(skipValidation=True)
-        self.parser._evaluateAndExtractInfoFromLine(["XOR", "#0xFF", "$B", ";test"], buildInstruction)
+        self.parser._evaluateAndExtractInfoFromLine(["XOR", "#0xFF", "$B", ";test"], buildInstruction, "")
         self.assertEqual(buildInstruction.instructionCode, None)
         self.assertEqual(buildInstruction.sourceRegister, None)
         self.assertEqual(buildInstruction.sourceImmediate, 0xFF)
@@ -1047,25 +1047,25 @@ class TestParser(unittest.TestCase):
         self.assertRaises(ValueError,
                           self.parser._evaluateAndExtractInfoFromLine,
                           ["MEMW", "[4", "#0xFF", "$A"],
-                          buildInstruction)
+                          buildInstruction, "")
 
         buildInstruction = Instruction(skipValidation=True)
         self.assertRaises(ValueError,
                           self.parser._evaluateAndExtractInfoFromLine,
                           ["MEMW", "<4", "#0xFF", "$A"],
-                          buildInstruction)
+                          buildInstruction, "")
 
         buildInstruction = Instruction(skipValidation=True)
         self.assertRaises(ValueError,
                           self.parser._evaluateAndExtractInfoFromLine,
                           ["MEMW", "$B", "#0xFF", "$A"],
-                          buildInstruction)
+                          buildInstruction, "")
 
         buildInstruction = Instruction(skipValidation=True)
         self.assertRaises(ValueError,
                           self.parser._evaluateAndExtractInfoFromLine,
                           ["MEMW", "4]", "#0xFF", "$A"],
-                          buildInstruction)
+                          buildInstruction, "")
 
     def test_findPossibleCodesForInstruction(self):
         """

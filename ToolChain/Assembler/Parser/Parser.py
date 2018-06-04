@@ -3,7 +3,7 @@
 
 """
 This file is part of Spartacus project
-Copyright (C) 2016  CSE
+Copyright (C) 2018  CSE
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -23,14 +23,13 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 from CapuaEnvironment.Instruction.Instruction import Instruction
 from CapuaEnvironment.Instruction.OperationDescription import operationDescription
 from CapuaEnvironment.IntructionFetchUnit.FormDescription import formDescription
-from Configuration.Configuration import REGISTER_A, \
-                                        REGISTER_B, \
-                                        REGISTER_C, \
-                                        REGISTER_D, \
-                                        REGISTER_E, \
-                                        REGISTER_F, \
-                                        REGISTER_G, \
-                                        REGISTER_S, \
+from Configuration.Configuration import REGISTER_A,  \
+                                        REGISTER_B,  \
+                                        REGISTER_C,  \
+                                        REGISTER_D,  \
+                                        REGISTER_E,  \
+                                        REGISTER_F,  \
+                                        REGISTER_G,  \
                                         REGISTER_A2, \
                                         REGISTER_B2, \
                                         REGISTER_C2, \
@@ -38,8 +37,8 @@ from Configuration.Configuration import REGISTER_A, \
                                         REGISTER_E2, \
                                         REGISTER_F2, \
                                         REGISTER_G2, \
+                                        REGISTER_S,  \
                                         REGISTER_S2
-
 from ToolChain.Assembler.Constants import REGISTER_PREFIX, \
                                           IMMEDIATE_PREFIX, \
                                           WIDTH_INDICATORS, \
@@ -54,7 +53,7 @@ from ToolChain.Assembler.Constants import REGISTER_PREFIX, \
 import struct
 
 __author__ = "CSE"
-__copyright__ = "Copyright 2015, CSE"
+__copyright__ = "Copyright 2018, CSE"
 __credits__ = ["CSE"]
 __license__ = "GPL"
 __version__ = "2.0"
@@ -67,7 +66,15 @@ class Parser:
     This class is used to parse the text format code and build a list of instruction from it.
     To do so, it has a direct link into CapuaEnvironment instruction information. Those class
     and description files are directly used in order to help build the binary code required
-    to run code inside of the Capua environment.
+    to run code inside of the Capua environment. The steps are as follows:
+
+    1. Verify if the file name is valid, and that it is not empty.
+    2. Read the file and parse each line into a list to be evaluated one at a time.
+    3. Evaluate each line and, if not an empty line, store instructions and memory references in lists.
+         - Parse each line and determine whether we're dealing with an instruction, memory reference, data, etc.
+         - If an instruction is found, determine all possible forms for this instruction (eg. ins - reg - reg)
+         - Using possible forms for an instruction, determine the correct instruction code based on given arguments.
+    4. Once all info has been evaluated, if correct, we generate the binary code for each instruction
     """
 
     loadAddress = 0x00
@@ -100,14 +107,14 @@ class Parser:
         :param file: String, the name of the file that needs to be read in to build the code
         :return: list: Content of the file, line by line.
         """
-        content = None
 
+        content = []
         codeFile = open(file, "r")
         origContent = codeFile.readlines()
         codeFile.close()
 
-        content = []
         for line in origContent:
+            # Remove newline char at the end of the line for parsing
             content.append(line.replace("\n", ""))
 
         return content
@@ -116,37 +123,45 @@ class Parser:
         """
         This method will take the content of the file and build a list of instruction with it.
         That list is in the same order as what is in the actual file content.
-        :return: list: this returns a list of instruction that are present in the file.
+        :return: list: this returns a list of the instructions that are present in the file.
         """
-        instructionList = []  # Will be built as [binaryInstruction, ...]
-        memoryReferenceDict = {}  # Will be built as [{"ref": relAddress}, ...]
-        relativeAddressCounter = 0
-        lineNo = 0
+
+        instructionList = []            # Will contain the list of binary instructions
+        memoryReferenceDict = {}        # Contains memory references. Will contain label along with its relative address
+        relativeAddressCounter = 0      # Counter cumulatively adds length of instructions.
+        lineNo = 0                      # Keeps track of current line being evaluated to print errors at specific lines
 
         for line in self.fileContent:
             lineNo += 1
+
             try:
-                sline = line.split()
-                if len(sline) > 0:
-                    # We are here, we have a code line
-                    buildInstruction, lineInstruction = self._parseCodeLine(sline)
+                rawLine = line
+                line = line.split()
+                if len(line) > 0:
+                    # If we make it here, there was something on the line
+                    # We move to the next step and parse the line to get the appropriate code for what's written
+                    buildInstruction, lineInstruction = self._parseCodeLine(line, rawLine)
+
                     if buildInstruction is not None:
-                        # There was something on this line
+                        # There was a valid instruction or memory reference on the line
+
                         if type(buildInstruction.instructionCode) is str:
-                            # We have a memory location reference!
+                            # We have a memory location reference
                             memoryReferenceDict[buildInstruction.instructionCode] = relativeAddressCounter
                         else:
-                            # We have an instruction!
+                            # We have an instruction
                             instructionList.append(lineInstruction)
                             relativeAddressCounter += buildInstruction.instructionLength
+
             except Exception as e:
+                # If all else fails, the line has invalid code
                 print("ERROR while asssembling line {}: '{}'".format(str(lineNo), line,))
                 print(e)
                 quit()
 
         return instructionList, memoryReferenceDict, relativeAddressCounter
 
-    def _parseCodeLine(self, line: list=None):
+    def _parseCodeLine(self, line: list=None, rawLine: str=None):
         """
         This will parse an extracted line of code and build an instruction from that code line
         Parsing a line of code requires many steps.
@@ -159,186 +174,92 @@ class Parser:
                 instruction simply represent a label in the code. It will be removed from the final
                 program.
 
-        :param line:
-        :return:
+        :param line: line split into individual arguments
+        :param rawLine: raw line as we originally read it from the file, used to preserve spaces in .dataAlpha fields
+        :return: The instruction object with all info about arguments, and the line's binary instruction
         """
-        lineInstruction = None
 
-        buildInstruction = Instruction(skipValidation=True)  # This is used as model in early instruction building
+        lineInstruction = None
+        buildInstruction = Instruction(skipValidation=True)  # This is used as a model in early instruction building
         finalCode = 0x00
         form = None
         possibleCodes = None
 
-        self._evaluateAndExtractInfoFromLine(line, buildInstruction)
+        # We evaluate the line and extract any bits of relevant info to build the appropriate instruction
+        self._evaluateAndExtractInfoFromLine(line, buildInstruction, rawLine)
 
         if type(buildInstruction.instructionCode) is not str:
-            # Instruction is real not just memory address or comment
+            # We assume it's an instruction (integer), since memory references or comments would be strings
+            # Parser will verify all possible codes, and generate the appropriate instruction based on its form
             possibleCodes = self._findPossibleCodesForInstruction(buildInstruction)
             instructionCode, instructionForm = self._getInstructionCodeAndFormUsingPossibleCodes(buildInstruction,
                                                                                                  possibleCodes)
             if instructionForm is None or instructionCode is None:
                 raise ValueError("Assembler general error")
             else:
+                # Code is valid, fetch the instruction's form based on the arguments, then generate the instruction
                 buildInstruction.instructionCode = instructionCode
                 buildInstruction.instructionLength = formDescription[instructionForm]["length"]
                 lineInstruction = self._generateBinaryInstructionFromInstruction(buildInstruction,
                                                                                  formDescription[instructionForm])
         else:
+            # In this case, there were no instructions. Thus, we look at other possibilities
             if COMMENT_INDICATORS in buildInstruction.instructionCode:
                 # Simply ignore a comment line
                 buildInstruction = None
                 lineInstruction = None
+
+            #  In these next cases, we can treat them as "data" variables with no real instructions.
+            #  We store the data as the instruction's source immediate value, and set instruction code to 0
             elif DATA_ALPHA_INDICATOR in buildInstruction.instructionCode:
-                # This is a bunch of alpha data
-                lineInstruction = buildInstruction.sourceImmediate
-                buildInstruction.instructionCode = 0  # Calling code expect this to be non STR for non mem ref
-            elif DATA_NUMERIC_INDICATOR in buildInstruction.instructionCode:
-                # This is a numeric data field
-                lineInstruction = struct.pack(">I", buildInstruction.sourceImmediate)
-                buildInstruction.instructionCode = 0  # Calling code expect this to be non STR for non mem ref
-            elif DATA_MEMORY_REFERENCE in buildInstruction.instructionCode:
+                # This is a bunch of alpha data (String)
                 lineInstruction = buildInstruction.sourceImmediate
                 buildInstruction.instructionCode = 0
+
+            elif DATA_NUMERIC_INDICATOR in buildInstruction.instructionCode:
+                # This is a numeric data field (Integer)
+                lineInstruction = struct.pack(">I", buildInstruction.sourceImmediate)
+                buildInstruction.instructionCode = 0
+
+            elif DATA_MEMORY_REFERENCE in buildInstruction.instructionCode:
+                # This is a data memory reference (dataMemref)
+                lineInstruction = buildInstruction.sourceImmediate
+                buildInstruction.instructionCode = 0
+
             else:
+                # Having exhausted all options, we assume there was nothing else on this line.
                 lineInstruction = None
 
         return buildInstruction, lineInstruction
 
-    def translateRegisterNameToRegisterCode(self, registerName: str=""):
+    def _evaluateAndExtractInfoFromLine(self, line, buildInstruction, rawLine):
         """
-        This takes a register name and returns a register code as per:
-            A = 0x00
-            B = 0x01
-            C = 0x10
-            ...
-            S = 0x1111
-        Throws error if register is not A, B, C or S
-        :param registerName: str, representing the register that needs translation
-        :return: int, the int that represents the register
-        """
-        registerCode = None
-        registerName = registerName.upper()
-
-        if registerName == "A":
-            registerCode = REGISTER_A
-        elif registerName == "B":
-            registerCode = REGISTER_B
-        elif registerName == "C":
-            registerCode = REGISTER_C
-        elif registerName == "D":
-            registerCode = REGISTER_D
-        elif registerName == "E":
-            registerCode = REGISTER_E
-        elif registerName == "F":
-            registerCode = REGISTER_F
-        elif registerName == "G":
-            registerCode = REGISTER_G
-        elif registerName == "A2":
-            registerCode = REGISTER_A2
-        elif registerName == "B2":
-            registerCode = REGISTER_B2
-        elif registerName == "C2":
-            registerCode = REGISTER_C2
-        elif registerName == "D2":
-            registerCode = REGISTER_D2
-        elif registerName == "E2":
-            registerCode = REGISTER_E2
-        elif registerName == "F2":
-            registerCode = REGISTER_F2
-        elif registerName == "G2":
-            registerCode = REGISTER_G2
-        elif registerName == "S":
-            registerCode = REGISTER_S
-        elif registerName == "S2":
-            registerCode = REGISTER_S2
-        else:
-            raise ValueError("Invalid register provided. '{}' seen as input, expect A, B, C or S.".format(registerName))
-
-        return registerCode
-
-    def translateTextImmediateToImmediate(self, textImmediate: str=""):
-        """
-        This will translate an immediate value in a way that can be understood by the architecture.
-        :param textImmediate: str, an immediate value to be translated
-        :return: int, an immediate that can be worked on
-        """
-        immediate = None
-        isNegative = False
-        textImmediate = textImmediate.lower()  # Needed in case of 0XFF instead of 0xFF
-
-        if textImmediate[0] == "-":
-            isNegative = True
-            textImmediate = textImmediate[1:]
-
-        if len(textImmediate) > 2 and textImmediate[0:2] == "0b":
-            # Indicates binary immediate
-            baseToUse = 2
-            textImmediate = textImmediate[2:]
-        elif len(textImmediate) > 2 and textImmediate[0:2] == "0x":
-            # Indicate hexadecimal immediate
-            baseToUse = 16
-            textImmediate = textImmediate[2:]
-        else:
-            # Take a leap of faith! This should be base 10
-            baseToUse = 10
-
-        immediate = int(textImmediate, baseToUse)
-
-        validationImmediate = immediate
-        immediate &= 0xFFFFFFFF  # Maximum immediate value is 32 bits
-
-        if validationImmediate != immediate:
-            raise ValueError("Given immediate value is too big, {} received but maxim value is 0xFFFFFFFF".format(hex(validationImmediate)))
-
-        # If number was negative, get the 2 complement for this number
-        if isNegative:
-            immediate ^= 0xFFFFFFFF  # Flips all the bits, yield the 1 complement
-            immediate += 1  # 1 complement + 1 gives the 2 complement
-            immediate &= 0xFFFFFFFF  # Trim down to acceptable size!
-
-        return immediate
-
-    def translateTextFlagsToCodeFlags(self, textFlags):
-        """
-        Will translate a text FLAGs to flags code as:
-        FLAGS: 0b000 : Zero, Lower, Higher
-        :param textFlags:
+        This is a helper method. The aim to this is to keep caller code cleaner
+        Method evaluates each part of the line to determine whether we're dealing with an instruction, label, data, etc.
+        We begin by verifying if the first argument has label or data mnemonics (not an instruction).
+        If none are found, we assume it's an instruction. We then proceed to evaluating the arguments.
+        The method uses the Instruction class' source and destination fields to enforce proper instruction format.
+        For example, if the source and destination have already been found, additional arguments means the line is an
+        invalid instruction.
+        :param line: the line we want to parse, already split into individual arguments
+        :param buildInstruction: Our template for the instruction, used to later build the instruction
+        :param rawLine: the line as we read it originally, preserved so we don't consume extra spaces for .dataAlpha
         :return:
         """
-        codeFlags = 0b000
-        originalFlags = textFlags
-        textFlags = textFlags.lower()
 
-        if "z" in textFlags or "e" in textFlags:
-            codeFlags |= 0b100
-            textFlags = textFlags.replace("z", "")
-            textFlags = textFlags.replace("e", "")
 
-        if "l" in textFlags:
-            codeFlags |= 0b010
-            textFlags = textFlags.replace("l", "")
+        foundSource = False                              # Flag for whether we found a source immediate or register
+        foundDestination = False                         # Flag for whether we found a destination immediate or register
+        indicator_list = [COMMENT_INDICATORS,            # List of non-instruction indicators
+                          MEMORY_REFERENCE_INDICATORS,
+                          DATA_ALPHA_INDICATOR,
+                          DATA_NUMERIC_INDICATOR,
+                          DATA_MEMORY_REFERENCE,
+                          EXPORTED_REFERENCE_INDICATOR]
 
-        if "h" in textFlags:
-            codeFlags |= 0b001
-            textFlags = textFlags.replace("h", "")
+        buildInstruction.operationMnemonic = line[0].upper()
 
-        if len(textFlags) > 0:
-            # Invalid flag selection detected!
-            raise ValueError("Invalid conditional flag detected {} was provided but is invalid".format(originalFlags))
-
-        return codeFlags
-
-    def _evaluateAndExtractInfoFromLine(self, line, buildInstruction):
-        """
-        This is an helper method. The aim to this is to keep caller code cleaner
-        TODO: refactor this... it's ugly
-        :param line:
-        :param buildInstruction:
-        :return:
-        """
-        foundSource = False  # Found source operand
-        foundDestination = False  # Keep us from abusive operation
-
+        # PART 1: Evaluate the first part of the line, look for items that aren't instructions (labels, memref, etc)
         if COMMENT_INDICATORS == line[0][0]:
             # We keep the comment indicator so we can later discard the instruction.
             buildInstruction.instructionCode = line[0].upper()
@@ -351,56 +272,30 @@ class Parser:
                 raise ValueError("Syntax error, memory reference has too many {}".format(MEMORY_REFERENCE_INDICATORS))
 
             buildInstruction.instructionCode = line[0].replace(MEMORY_REFERENCE_INDICATORS, "").upper()
+
             return
 
-        # First thing is either a mnemonic or a data identifier or a global memory reference
-        buildInstruction.operationMnemonic = line[0].upper()
-
-        if EXPORTED_REFERENCE_INDICATOR in buildInstruction.operationMnemonic:
-            # This is a memory reference... However, this one is on a global scale (exported)
-            # this is a special case
-            buildInstruction.instructionCode = line[0].upper() + " "
-            buildInstruction.instructionCode += line[1].replace(MEMORY_REFERENCE_INDICATORS, "").upper()
-            return
-        if DATA_NUMERIC_INDICATOR in buildInstruction.operationMnemonic:
-            # Treat this as a numeric field!
-            # The numeric value will be but in source immediate value
-            numericValue = self.translateTextImmediateToImmediate(line[1])
-            buildInstruction.sourceImmediate = numericValue
-            buildInstruction.instructionLength = 4
-            buildInstruction.instructionCode = line[0].upper()
-            return
-        if DATA_ALPHA_INDICATOR in buildInstruction.operationMnemonic:
-            # Treat this as an alphabetic field!
-            # The alpha value will be put in the source immediate value
-            # We need to rebuild the alpha into a byte string.
-            alpha = b""
-            for part in line[1:]:
-                alpha += part.encode("utf-8") + b" "
-            alpha = alpha[0:-1]  # Remove trailing space
-            alpha += b"\x00"  # Strings are null terminated
-            buildInstruction.sourceImmediate = alpha
-            buildInstruction.instructionLength = len(alpha)
-            buildInstruction.instructionCode = line[0].upper()
-            return
-        if DATA_MEMORY_REFERENCE in buildInstruction.operationMnemonic:
-            # This is a memory reference used as a constant that needs to be
-            # linked later in the process.
-            if line[1][0] == ":":
-                line[1] = line[1][1:]
-            buildInstruction.sourceImmediate = (":" + line[1] + ":").upper().encode("utf-8")
-            buildInstruction.instructionLength = 4
-            buildInstruction.instructionCode = DATA_MEMORY_REFERENCE
+        if buildInstruction.operationMnemonic in indicator_list:
+            # If the first argument of the line isn't an instruction, memory reference, or comment,
+            # it could be an indicator
+            self._parseIndicatorData(line, buildInstruction, rawLine)
             return
 
-        # We don't want to redo the first part. That would cause problem with in code memory references.
+        # PART 2: Evaluate arguments
+        # We continue evaluating the line to find the possible arguments of an instruction since no mnemonics were found
+        # First part of the line would theoretically be the instruction, so we omit it.
+        # We keep track of whether or not we found the source and destination of a particular instruction.
+        # This allows us to determine if the instruction has extra arguments, rendering it invalid.
+        # Handling for single argument instructions is handled in the findPossibleCodesForInstruction method.
         for part in line[1:]:
+
             if part[0] is COMMENT_INDICATORS:
-                break  # We are done with this line of code, we found a comment
+                # We are done with this line of code, we found a comment
+                break
 
             elif part[0] is FLAGS_INDICATORS[0]:
                 if part[-1] is FLAGS_INDICATORS[-1]:
-                    # This is FLAGS Indicator!!
+                    # This is FLAGS Indicator "<>"
                     buildInstruction.flags = self.translateTextFlagsToCodeFlags(part[1:-1])
                 else:
                     raise ValueError("Syntax error, opening {} missing closing {}".format(FLAGS_INDICATORS[0],
@@ -409,8 +304,8 @@ class Parser:
 
             elif part[0] is WIDTH_INDICATORS[0]:
                 if part[-1] is WIDTH_INDICATORS[-1]:
-                    # This is WIDTH Indicator!!
-                    buildInstruction.width = self.translateTextImmediateToImmediate(part[1:-1])  # Reusing immediate logic
+                    # This is WIDTH Indicator "[]"
+                    buildInstruction.width = self.translateTextImmediateToImmediate(part[1:-1])
                 else:
                     raise ValueError("Syntax error, opening {} missing closing {}".format(WIDTH_INDICATORS[0],
                                                                                           WIDTH_INDICATORS[-1]))
@@ -426,10 +321,11 @@ class Parser:
                         raise ValueError("Invalid operation format")
                     foundDestination = True
                     buildInstruction.destinationRegister = self.translateRegisterNameToRegisterCode(part[1:])
+
                 continue
 
             elif part[0] is IMMEDIATE_PREFIX:
-                # This is an immediate
+                # This is an immediate value
                 if not foundSource:
                     foundSource = True
                     buildInstruction.sourceImmediate = self.translateTextImmediateToImmediate(part[1:])
@@ -438,27 +334,88 @@ class Parser:
                         raise ValueError("Invalid operation format")
                     foundDestination = True
                     buildInstruction.destinationImmediate = self.translateTextImmediateToImmediate(part[1:])
+
                 continue
 
             else:
                 # This is a memory reference to be treated as an immediate
-                if part[0] == ":":
+                if part[0] == MEMORY_REFERENCE_INDICATORS:
                     part = part[1:]
                 if not foundSource:
                     foundSource = True
+
                     # Verify this reference doesn't have additonal ':', hotfix for issue 18
-                    if part.count(':') > 0:
+                    if part.count(MEMORY_REFERENCE_INDICATORS) > 0:
                         raise ValueError("Syntax error, memory reference has too many {}".format(MEMORY_REFERENCE_INDICATORS))
-                    buildInstruction.sourceImmediate = MEMORY_REFERENCE_INDICATORS+ part.upper() + MEMORY_REFERENCE_INDICATORS
+                    buildInstruction.sourceImmediate = MEMORY_REFERENCE_INDICATORS + part.upper() + \
+                                                       MEMORY_REFERENCE_INDICATORS
+                    
                 else:
                     if foundDestination:
                         raise ValueError("Invalid operation format")
                     foundDestination = True
+
                     # Verify this label doesn't have additonal ':', hotfix for issue 18
-                    if part.count(':') > 0:
+                    if part.count(MEMORY_REFERENCE_INDICATORS) > 0:
                         raise ValueError("Syntax error, memory reference has too many {}".format(MEMORY_REFERENCE_INDICATORS))
-                    buildInstruction.destinationImmediate = MEMORY_REFERENCE_INDICATORS + part.upper() + MEMORY_REFERENCE_INDICATORS
+                    buildInstruction.destinationImmediate = MEMORY_REFERENCE_INDICATORS + \
+                                                            part.upper() + \
+                                                            MEMORY_REFERENCE_INDICATORS
+
                 continue
+
+    def _parseIndicatorData(self, line, buildInstruction, rawLine):
+        '''
+        Helper method to segregate the evaluateAndExtractInfoFromLine method's operations.
+        This is called if the first argument of a line isn't an instruction. Cases could be:
+        -Global memory reference label
+        -Local memory reference label
+        -Comment
+        -.dataAlpha, .dataNumeric, or .dataMemref
+        :param line: The line split into individual arguments
+        :param buildInstruction: Template object to hold information on final instruction to be built
+        :param rawLine: The raw line as we originally read it from the file, used to preserve spaces in string (.dataAlpha)
+        :return:
+        '''
+
+        if EXPORTED_REFERENCE_INDICATOR in buildInstruction.operationMnemonic:
+            # Global memory reference which can be used by other files. This is a special case
+            buildInstruction.instructionCode = line[0].upper() + " "
+            buildInstruction.instructionCode += line[1].replace(MEMORY_REFERENCE_INDICATORS, "").upper()
+            return
+
+        if DATA_NUMERIC_INDICATOR in buildInstruction.operationMnemonic:
+            # Treat this as a numeric field
+            # The numeric value will be treated as a source immediate value in the instruction object
+            numericValue = self.translateTextImmediateToImmediate(line[1])
+            buildInstruction.sourceImmediate = numericValue
+            buildInstruction.instructionLength = 4
+            buildInstruction.instructionCode = line[0].upper()
+            return
+
+        if DATA_ALPHA_INDICATOR in buildInstruction.operationMnemonic:
+            # Treat this as an alphabetic field
+            # The alpha value will be put in the source immediate value as well
+            # We need to rebuild the alpha into a byte string to be read by the VM
+            # We want to preserve spaces in the original string, so we limit the split to the first argument
+            rawLine = rawLine.split(maxsplit=1)
+            alpha = b"" + rawLine[1].encode("utf-8") + b" "
+            alpha = alpha[0:-1]  # Remove trailing space
+            alpha += b"\x00"  # Strings are null terminated
+            buildInstruction.sourceImmediate = alpha
+            buildInstruction.instructionLength = len(alpha)  # Length of the instruction is simply length of string
+            buildInstruction.instructionCode = line[0].upper()
+            return
+
+        if DATA_MEMORY_REFERENCE in buildInstruction.operationMnemonic:
+            # This is a memory reference used as a constant that needs to be linked later in the process.
+            if line[1][0] == ":":
+                line[1] = line[1][1:]
+
+            buildInstruction.sourceImmediate = (":" + line[1] + ":").upper().encode("utf-8")
+            buildInstruction.instructionLength = 4
+            buildInstruction.instructionCode = DATA_MEMORY_REFERENCE
+            return
 
     def _findPossibleCodesForInstruction(self, partialInstruction: Instruction=None):
         """
@@ -470,6 +427,7 @@ class Parser:
         :return: list, will return the complete list of possible instruction code for a given partial instruction
                     return None if no instruction code matches... This is likely to be a memory identifier.
         """
+
         possibleCodes = None
 
         try:
@@ -520,7 +478,8 @@ class Parser:
                                  "width",
                                  "flags",
                                  "instructionLength"]
-        # This deals with overlong instructions ex: JMP $A $B <- one too many register
+
+        # This deals with unnecessarily long instructions. Ex: JMP $A $B <- one too many register
         for param in goodInstructionParams:
             if param not in formDescription[instructionForm]["description"]:
                 insParam = getattr(partialInstruction, param)
@@ -537,6 +496,7 @@ class Parser:
         :param form: dict, a form dict that allows creation of the code
         :return:
         """
+
         binaryInstruction = 0
         instructionPartOriginal = None
         instructionPartToBeUsed = None
@@ -550,18 +510,17 @@ class Parser:
             # easiest way that my brain could come up with. All other ways of building instructions
             # seems to rely on ugly logic based on if chaining... Ugly. This is better. We are shifting
             # until we find the "edge" of this part of the instruction.
+
             while instructionPartBitMask % 2 is not 1:
                 instructionPartBitMask >>= 1  # Shift right one bit
                 shiftValue += 1
 
+            # We grab the value of the instruction to determine whether it's an actual instruction or a memory reference
             instructionPartOriginal = getattr(instruction, instructionPart)
-            # We need an intermediate step because a part could be text...
+            # We need an intermediate step because a part could be text
+
             if type(instructionPartOriginal) is str:
                 # This is a memory reference
-                # yes it will cause a bug it this specific chain is naturally present inside  an
-                # instruction code TODO fix this bug
-                # However, at time of writing many other problems are more pressing... This requires more thinking
-                # and can safely wait for quite a while...
                 memoryRefSymbol = instructionPartOriginal
                 instructionPartToBeUsed = 0xDEADBEEF
             else:
@@ -570,7 +529,7 @@ class Parser:
             instructionPartBinaryValue = instructionPartBitMask & instructionPartToBeUsed
             binaryInstruction |= (instructionPartBinaryValue << shiftValue)
 
-        # At this point, logic is we have a fully built binary instruction. Yay!
+        # At this point, logic is we have a fully built binary instruction.
         # We now need to transform this into a byte string
         binaryInstructionByteString = b""
 
@@ -585,3 +544,131 @@ class Parser:
                                                                               memoryRefSymbol.encode())
 
         return binaryInstructionByteString
+
+    def translateRegisterNameToRegisterCode(self, registerName: str=""):
+        """
+        This takes a register name and returns a register code as per:
+            A = 0b0000
+            B = 0b0001
+            C = 0b0010
+            ...
+            etc.
+        Throws error if register is not part of valid list within system.
+        :param registerName: str, representing the register that needs translation
+        :return: int, the int that represents the register
+        """
+
+        registerCode = None
+        registerName = registerName.upper()
+
+        if registerName == "A":
+            registerCode = REGISTER_A
+        elif registerName == "B":
+            registerCode = REGISTER_B
+        elif registerName == "C":
+            registerCode = REGISTER_C
+        elif registerName == "D":
+            registerCode = REGISTER_D
+        elif registerName == "E":
+            registerCode = REGISTER_E
+        elif registerName == "F":
+            registerCode = REGISTER_F
+        elif registerName == "G":
+            registerCode = REGISTER_G
+        elif registerName == "A2":
+            registerCode = REGISTER_A2
+        elif registerName == "B2":
+            registerCode = REGISTER_B2
+        elif registerName == "C2":
+            registerCode = REGISTER_C2
+        elif registerName == "D2":
+            registerCode = REGISTER_D2
+        elif registerName == "E2":
+            registerCode = REGISTER_E2
+        elif registerName == "F2":
+            registerCode = REGISTER_F2
+        elif registerName == "G2":
+            registerCode = REGISTER_G2
+        elif registerName == "S":
+            registerCode = REGISTER_S
+        elif registerName == "S2":
+            registerCode = REGISTER_S2
+        else:
+            raise ValueError("Invalid register provided. '{}' seen as input, expect valid register."
+                             .format(registerName))
+
+        return registerCode
+
+    def translateTextImmediateToImmediate(self, textImmediate: str=""):
+        """
+        This will translate an immediate value in a way that can be understood by the architecture.
+        :param textImmediate: str, an immediate value to be translated
+        :return: int, an immediate that can be worked on
+        """
+
+        immediate = None
+        isNegative = False
+        textImmediate = textImmediate.lower()  # Needed in case of 0XFF instead of 0xFF
+
+        if textImmediate[0] == "-":
+            isNegative = True
+            textImmediate = textImmediate[1:]
+
+        if len(textImmediate) > 2 and textImmediate[0:2] == "0b":
+            # Indicates binary immediate
+            baseToUse = 2
+            textImmediate = textImmediate[2:]
+        elif len(textImmediate) > 2 and textImmediate[0:2] == "0x":
+            # Indicate hexadecimal immediate
+            baseToUse = 16
+            textImmediate = textImmediate[2:]
+        else:
+            # Take a leap of faith! This should be base 10
+            baseToUse = 10
+
+        immediate = int(textImmediate, baseToUse)
+
+        validationImmediate = immediate
+        immediate &= 0xFFFFFFFF  # Maximum immediate value is 32 bits
+
+        if validationImmediate != immediate:
+            raise ValueError("Given immediate value is too big, {} received but maxim value is 0xFFFFFFFF".format(hex(validationImmediate)))
+
+        if isNegative:
+            # If number was negative, get the 2 complement for this number
+            immediate ^= 0xFFFFFFFF  # Flips all the bits, yield the 1 complement
+            immediate += 1  # 1 complement + 1 gives the 2 complement
+            immediate &= 0xFFFFFFFF  # Trim down to acceptable size!
+
+        return immediate
+
+    def translateTextFlagsToCodeFlags(self, textFlags):
+        """
+        Will translate a text FLAGs to flags code as:
+        FLAGS: 0b000 : Zero, Lower, Higher
+        :param textFlags:
+        :return:
+        """
+
+        codeFlags = 0b000
+        originalFlags = textFlags
+        textFlags = textFlags.lower()
+
+        if "z" in textFlags or "e" in textFlags:
+            codeFlags |= 0b100
+            textFlags = textFlags.replace("z", "")
+            textFlags = textFlags.replace("e", "")
+
+        if "l" in textFlags:
+            codeFlags |= 0b010
+            textFlags = textFlags.replace("l", "")
+
+        if "h" in textFlags:
+            codeFlags |= 0b001
+            textFlags = textFlags.replace("h", "")
+
+        if len(textFlags) > 0:
+            # Invalid flag selection detected!
+            raise ValueError("Invalid conditional flag detected {} was provided but is invalid".format(originalFlags))
+
+        return codeFlags

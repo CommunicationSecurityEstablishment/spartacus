@@ -339,11 +339,17 @@ class Parser:
         foundSource = False  # Found source operand
         foundDestination = False  # Keep us from abusive operation
 
-        if (MEMORY_REFERENCE_INDICATORS == line[0][-1]) or COMMENT_INDICATORS == line[0][0]:
-            # This is no code line... No need for further work, return!
+        if COMMENT_INDICATORS == line[0][0]:
             # We keep the comment indicator so we can later discard the instruction.
-            # Put text into instructionCode since this is an impossible case... Easy to
-            # follow in calling code. And put in some indicator for the linker.
+            buildInstruction.instructionCode = line[0].upper()
+            return
+
+        if MEMORY_REFERENCE_INDICATORS == line[0][-1]:
+            # This line is a memory label, keep it intact for now. Offsets for these symbols will be generated later
+            # Verify this label doesn't have additonal ':', hotfix for issue 18
+            if line[0].count(':') > 1:
+                raise ValueError("Syntax error, memory reference has too many {}".format(MEMORY_REFERENCE_INDICATORS))
+
             buildInstruction.instructionCode = line[0].replace(MEMORY_REFERENCE_INDICATORS, "").upper()
             return
 
@@ -440,11 +446,17 @@ class Parser:
                     part = part[1:]
                 if not foundSource:
                     foundSource = True
+                    # Verify this reference doesn't have additonal ':', hotfix for issue 18
+                    if part.count(':') > 0:
+                        raise ValueError("Syntax error, memory reference has too many {}".format(MEMORY_REFERENCE_INDICATORS))
                     buildInstruction.sourceImmediate = MEMORY_REFERENCE_INDICATORS+ part.upper() + MEMORY_REFERENCE_INDICATORS
                 else:
                     if foundDestination:
                         raise ValueError("Invalid operation format")
                     foundDestination = True
+                    # Verify this label doesn't have additonal ':', hotfix for issue 18
+                    if part.count(':') > 0:
+                        raise ValueError("Syntax error, memory reference has too many {}".format(MEMORY_REFERENCE_INDICATORS))
                     buildInstruction.destinationImmediate = MEMORY_REFERENCE_INDICATORS + part.upper() + MEMORY_REFERENCE_INDICATORS
                 continue
 

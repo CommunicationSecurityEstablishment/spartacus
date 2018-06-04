@@ -174,9 +174,9 @@ class Parser:
                 instruction simply represent a label in the code. It will be removed from the final
                 program.
 
-        :param line:
-        :param rawLine
-        :return:
+        :param line: line split into individual arguments
+        :param rawLine: raw line as we originally read it from the file, used to preserve spaces in .dataAlpha fields
+        :return: The instruction object with all info about arguments, and the line's binary instruction
         """
 
         lineInstruction = None
@@ -243,9 +243,9 @@ class Parser:
         The method uses the Instruction class' source and destination fields to enforce proper instruction format.
         For example, if the source and destination have already been found, additional arguments means the line is an
         invalid instruction.
-        :param line:
-        :param buildInstruction:
-        :param rawLine
+        :param line: the line we want to parse, already split into individual arguments
+        :param buildInstruction: Our template for the instruction, used to later build the instruction
+        :param rawLine: the line as we read it originally, preserved so we don't consume extra spaces for .dataAlpha
         :return:
         """
 
@@ -262,7 +262,6 @@ class Parser:
         buildInstruction.operationMnemonic = line[0].upper()
 
         # PART 1: Evaluate the first part of the line, look for items that aren't instructions (labels, memref, etc)
-
         if COMMENT_INDICATORS == line[0][0]:
             # We keep the comment indicator so we can later discard the instruction.
             buildInstruction.instructionCode = line[0].upper()
@@ -342,13 +341,13 @@ class Parser:
 
             else:
                 # This is a memory reference to be treated as an immediate
-                if part[0] == ":":
+                if part[0] == MEMORY_REFERENCE_INDICATORS:
                     part = part[1:]
                 if not foundSource:
                     foundSource = True
 
                     # Verify this reference doesn't have additonal ':', hotfix for issue 18
-                    if part.count(':') > 0:
+                    if part.count(MEMORY_REFERENCE_INDICATORS) > 0:
                         raise ValueError("Syntax error, memory reference has too many {}".format(MEMORY_REFERENCE_INDICATORS))
                     buildInstruction.sourceImmediate = MEMORY_REFERENCE_INDICATORS + part.upper() + \
                                                        MEMORY_REFERENCE_INDICATORS
@@ -359,9 +358,10 @@ class Parser:
                     foundDestination = True
 
                     # Verify this label doesn't have additonal ':', hotfix for issue 18
-                    if part.count(':') > 0:
+                    if part.count(MEMORY_REFERENCE_INDICATORS) > 0:
                         raise ValueError("Syntax error, memory reference has too many {}".format(MEMORY_REFERENCE_INDICATORS))
-                    buildInstruction.destinationImmediate = MEMORY_REFERENCE_INDICATORS + part.upper() + \
+                    buildInstruction.destinationImmediate = MEMORY_REFERENCE_INDICATORS + \
+                                                            part.upper() + \
                                                             MEMORY_REFERENCE_INDICATORS
 
                 continue
@@ -374,9 +374,9 @@ class Parser:
         -Local memory reference label
         -Comment
         -.dataAlpha, .dataNumeric, or .dataMemref
-        :param line:
-        :param buildInstruction:
-        :param rawLine
+        :param line: The line split into individual arguments
+        :param buildInstruction: Template object to hold information on final instruction to be built
+        :param rawLine: The raw line as we originally read it from the file, used to preserve spaces in string (.dataAlpha)
         :return:
         '''
 
@@ -400,7 +400,6 @@ class Parser:
             # The alpha value will be put in the source immediate value as well
             # We need to rebuild the alpha into a byte string to be read by the VM
             # We want to preserve spaces in the original string, so we limit the split to the first argument
-
             rawLine = rawLine.split(maxsplit=1)
             alpha = b"" + rawLine[1].encode("utf-8") + b" "
             alpha = alpha[0:-1]  # Remove trailing space

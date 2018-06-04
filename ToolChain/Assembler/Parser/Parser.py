@@ -193,10 +193,9 @@ class Parser:
             # Parser will verify all possible codes, and generate the appropriate instruction based on its form
             possibleCodes = self._findPossibleCodesForInstruction(buildInstruction)
             instructionCode, instructionForm = self._getInstructionCodeAndFormUsingPossibleCodes(buildInstruction,
-                                                                                          possibleCodes)
+                                                                                                 possibleCodes)
             if instructionForm is None or instructionCode is None:
                 raise ValueError("Assembler general error")
-
             else:
                 # Code is valid, fetch the instruction's form based on the arguments, then generate the instruction
                 buildInstruction.instructionCode = instructionCode
@@ -205,7 +204,6 @@ class Parser:
                                                                                  formDescription[instructionForm])
         else:
             # In this case, there were no instructions. Thus, we look at other possibilities
-
             if COMMENT_INDICATORS in buildInstruction.instructionCode:
                 # Simply ignore a comment line
                 buildInstruction = None
@@ -445,7 +443,6 @@ class Parser:
         """
         This will complete the partial instruction by using the possible codes list. It will attempt at finding the
         correct form for the instruction.
-
         :param partialInstruction: Instruction, the partial instruction that needs to be completed
         :param possibleCodes: list, a list of possible partials
         :return: return the instructionCode and the form to be used to further work on the instruction

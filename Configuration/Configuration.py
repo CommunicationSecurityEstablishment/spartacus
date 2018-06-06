@@ -75,3 +75,11 @@ VIRTUAL_BOOT_ENABLED = True       # This will enforce booting from the "hard dri
 FIRMWARE_LOAD_ADDRESS = 0x40001000      # Firmware will be loaded at this address when using virtual boot
 FIRMWARE_BINARY_FILE_PATH = "CapuaEnvironment/firmware.bin"
 
+INSTRUCTION_LIST = ["ACTI", "ADD", "AND", "CALL", "CMP", "DACTI", "DIV", "HIRET",
+                    "INT", "JMP", "JMPR", "MEMR", "MEMW", "MOV", "MUL", "NOP", "NOT", "NOP",
+                    "OR", "POP", "PUSH", "RET", "SFSTOR", "SIVR", "SHL", "SHR", "SUB", "XOR"]
+
+LABEL_INSTRUCTIONS = ["CALL", "JMP", "MOV", "PUSH"]
+
+IDENTIFIER_LIST = [":", ".GLOBAL", ".DATAALPHA", ".DATANUMERIC", ".DATAMEMREF", ";"]
+

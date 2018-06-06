@@ -1,52 +1,19 @@
 #!/usr/bin/env python
 #  -*- coding: <utf-8> -*-
 
-"""
-This file is part of Spartacus project
-Copyright (C) 2016  CSE
-
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along
-with this program; if not, write to the Free Software Foundation, Inc.,
-51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-"""
-
 from ToolChain.Assembler.Parser.Parser import Parser
-from ToolChain.Assembler.Constants import EXPORTED_REFERENCE_INDICATOR
 
-__author__ = "CSE"
-__copyright__ = "Copyright 2015, CSE"
-__credits__ = ["CSE"]
-__license__ = "GPL"
-__version__ = "2.0"
-__maintainer__ = "CSE"
-__status__ = "Dev"
+import struct
 
 
 class Assembler:
-    """
-    This class is the center piece of the assembler. Files created by this assembler
-    are ready to be submited to the linker for final linking and creation of the final
-    binary file.
-    """
-
-    parser = None
 
     def __init__(self, inputFile=None, outputFile=None):
         """
         This allows for simple initialisation of the assembler. It will spawn the required
-        parser that will parse the assembly code into binary format. It will then call
-        buildAssembledFile so that the final file can be created.
-        :return:
+        instructionBuilder that will parse the assembly code into binary format.
+        :param inputFile:
+        :param outputFile:
         """
 
         if type(inputFile) is not str or len(inputFile) is 0:
@@ -56,79 +23,78 @@ class Assembler:
             # File is invalid
             raise ValueError("Assembler error - Invalid output file selected")
 
-        self.parser = Parser(file=inputFile)
-        data = self.buildAssembledFile()
-        self.writeAssembledFile(file=outputFile, outputData=data)
+        self._buildAssembledFile(inputFile, outputFile)
 
-    def buildAssembledFile(self):
-        """
-        This method is responsible for creating the final XML based "binary" (yes, this is
-        an abused of language),
-        :return:
-        """
-        import struct
-        fileContent = b""
-        # First we need the assembly size, this is to help linker do its job
-        fileContent += b"<AssemblySize>"
-        fileContent += struct.pack(">I", self.parser.finalSize)
-        fileContent += b"</AssemblySize>"
+    def _buildAssembledFile(self, inputFile, outputFile):
+        build = Parser()                              # Parser object which will return the binary code for instructions
+        masterString = b""                                              # String that will eventually be our output file
+        xmlstring = b""                        # String that will contain the "xml" data at the beginning of the .o file
+        global_list = []                                  # Temporary list to hold the names of global(external) symbols
+        external_list = []                                    # Master list of all external symbols to be used by linker
+        internal_list = []                                                         # Master list of all internal symbols
+        offset = 0                            # Offset used to calculate a label's offset from the beginning of the file
 
-        validInternalRef = []   # This will be used to validate for good external reference
-                                # This works because all reference (internal and external) end up
-                                # listed in the internal references anyway.
-
-        # Deal with internal symbols
-        fileContent += b"<InternalSymbols>"
-        for reference in self.parser.referenceDict:
-            if EXPORTED_REFERENCE_INDICATOR not in reference:
-                validInternalRef.append(reference)
-                fileContent += b"<refName>" + reference.encode("utf-8") + b"</refName>"
-                fileContent += b"<refAdd>" + struct.pack(">I", self.parser.referenceDict[reference]) + b"</refAdd>"
-
-                # Update global offsets would it be required
-                # This is required since all global offsets are set to 0 at the moment they are parsed
-                wouldBeExported = EXPORTED_REFERENCE_INDICATOR + " " + reference
-                if wouldBeExported in self.parser.referenceDict.keys():
-                    self.parser.referenceDict[wouldBeExported] = self.parser.referenceDict[reference]
-
-        fileContent += b"</InternalSymbols>"
-
-        # External symbols allow for a file to be linked with another file
-        fileContent += b"<ExternalSymbols>"
-        for reference in self.parser.referenceDict:
-            if EXPORTED_REFERENCE_INDICATOR in reference:
-                isValid = False
-                shortReference = reference.split()[1]
-                for internalReference in validInternalRef:
-                    if shortReference == internalReference:
-                        isValid = True
-                        break
-
-                if isValid:
-                    refName = reference.split()[1]
-                    fileContent += b"<refName>" + refName.encode("utf-8") + b"</refName>"
-                    fileContent += b"<refAdd>" + struct.pack(">I", self.parser.referenceDict[reference]) + b"</refAdd>"
-                else:
-                    raise ValueError("Unresolved reference: {} is exported but "
-                                     "is never declared.".format(reference))
-        fileContent += b"</ExternalSymbols>"
-
-        # Deal with the text section
-        fileContent += b"<Text>"
-        for instruction in self.parser.instructionList:
-            fileContent += instruction
-        fileContent += b"</Text>"
-
-        return fileContent
-
-    def writeAssembledFile(self, file=None, outputData=None):
-        """
-        This will write the assembled file to disk
-        :param file: str, output file path
-        :param outputData: bytes, the data to be written on the disk
-        :return:
-        """
-
-        file = open(file, mode="wb")
-        file.write(outputData)
+        file = open(inputFile, mode="r")
+        file_lines = file.readlines()
         file.close()
+
+        # This block assembles the binary data itself. It will parse each line individually and extract the info needed:
+        # 1.If the label flag is set to 0, it's a regular instruction, string, number, of memref.
+        # 2.If the label flag is set to 1, it's an internal symbol.
+        # 3.If the label flag is set to 2, it's an external symbol.
+        # In cases 2 and 3, the symbols are added to their respective lists along with their memory location.
+        # Memory locations are relative to the beginning of the file. Instructions and data are given set lengths.
+        # Internal and external symbol lists contain tuples containing the symbol name, and its offset.
+        # These will be used to fill the .o file information before the binary data.
+
+        masterString += b"<Text>"
+
+        for line in file_lines:
+
+            if line[0] != "\n":
+
+                if line is not None:
+                    instruction, offset, label_flag = build.build(line)
+                    if label_flag == 0:
+                        masterString += instruction
+
+                    elif label_flag == 1:
+                        label_tuple = (instruction, offset)
+                        internal_list.append(label_tuple)
+                        if instruction in global_list:
+                            external_list.append(label_tuple)
+
+                    elif label_flag == 2:
+                        global_list.append(instruction)
+
+                    elif label_flag == 3:
+                        # flag for comment, we simply ignore and move on to the next line
+                        pass
+
+                    else:
+                        print("Something went horribly wrong")
+
+        masterString += b"</Text>"
+
+        # builds the output file by extracting and printing each symbol into its appropriate category.
+        xmlstring = b"<AssemblySize>" + struct.pack(">I", build.relativeAddressCounter) + \
+                    b"</AssemblySize><InternalSymbols>"
+
+        for word in internal_list:
+            xmlstring += b"<refName>" + word[0].encode("utf-8") + b"</refName>"
+            xmlstring += b"<refAdd>" + struct.pack(">I", word[1]) + b"</refAdd>"
+
+        xmlstring += b"</InternalSymbols><ExternalSymbols>"
+
+        for word in external_list:
+            xmlstring += b"<refName>" + word[0].encode("utf-8") + b"</refName>"
+            xmlstring += b"<refAdd>" + struct.pack(">I", word[1]) + b"</refAdd>"
+
+        xmlstring += b"</ExternalSymbols>"
+
+        # Now we can put the xml string together with the masterString to output to file
+        xmlstring += masterString
+        file = open(outputFile, mode="wb")
+        file.write(xmlstring)
+        file.close()
+

@@ -37,7 +37,7 @@ class TestParser(unittest.TestCase):
 
     parser = Parser()
 
-    def test_build(self):
+    def test_parse(self):
         """
         Tests the method:
         build(self, text)
@@ -45,76 +45,61 @@ class TestParser(unittest.TestCase):
 
         self.parser.relativeAddressCounter = 0
         text = "MOV $B $C"
-        instruction, relAddress, flag = self.parser.build(text)
-        expectedInstruction = bytes((0b10011011,)) + bytes((0b00010010,))
-        expectedRelAddress = 2
-        expectedFlag = 0
-        self.assertEqual(instruction, expectedInstruction)
-        self.assertEqual(relAddress, expectedRelAddress)
-        self.assertEqual(flag, expectedFlag)
+        instruction, relAddress, flag = self.parser.parse(text)
+        self.assertEqual(instruction, bytes((0b10011011,)) + bytes((0b00010010,)))
+        self.assertEqual(relAddress, 2)
+        self.assertEqual(flag, 0)
 
         self.parser.relativeAddressCounter = 0
         text = ".dataAlpha test string  two  spaces\n"
-        instruction, relAddress, flag = self.parser.build(text)
-        expectedInstruction = b'test string  two  spaces\x00'
-        expectedRelAddress = 25
-        expectedFlag = 0
-        self.assertEqual(instruction, expectedInstruction)
-        self.assertEqual(relAddress, expectedRelAddress)
-        self.assertEqual(flag, expectedFlag)
+        instruction, relAddress, flag = self.parser.parse(text)
+        self.assertEqual(instruction, b'test string  two  spaces\x00')
+        self.assertEqual(relAddress, 25)
+        self.assertEqual(flag, 0)
 
         self.parser.relativeAddressCounter = 0
         text = ".global start"
-        instruction, relAddress, flag = self.parser.build(text)
-        expectedInstruction = "START"
-        expectedRelAddress = 0
-        expectedFlag = 2
-        self.assertEqual(instruction, expectedInstruction)
-        self.assertEqual(relAddress, expectedRelAddress)
-        self.assertEqual(flag, expectedFlag)
+        instruction, relAddress, flag = self.parser.parse(text)
+        self.assertEqual(instruction, "START")
+        self.assertEqual(relAddress, 0)
+        self.assertEqual(flag, 2)
 
         self.parser.relativeAddressCounter = 0
         text = "start:"
-        instruction, relAddress, flag = self.parser.build(text)
-        expectedInstruction = "START"
-        expectedRelAddress = 0
-        expectedFlag = 1
-        self.assertEqual(instruction, expectedInstruction)
-        self.assertEqual(relAddress, expectedRelAddress)
-        self.assertEqual(flag, expectedFlag)
+        instruction, relAddress, flag = self.parser.parse(text)
+        self.assertEqual(instruction, "START")
+        self.assertEqual(relAddress, 0)
+        self.assertEqual(flag, 1)
 
         self.parser.relativeAddressCounter = 0
         text = "MOV start $B"
-        instruction, relAddress, flag = self.parser.build(text)
-        expectedInstruction = bytes((0b01100000,)) + b':START:' + bytes((0b00000001,))
-        expectedRelAddress = 6
-        expectedFlag = 0
-        self.assertEqual(instruction, expectedInstruction)
-        self.assertEqual(relAddress, expectedRelAddress)
-        self.assertEqual(flag, expectedFlag)
+        instruction, relAddress, flag = self.parser.parse(text)
+        self.assertEqual(instruction, bytes((0b01100000,)) + b':START:' + bytes((0b00000001,)))
+        self.assertEqual(relAddress, 6)
+        self.assertEqual(flag, 0)
 
-    def test_buildError(self):
+    def test_parseError(self):
         """
         Tests various errors for the method:
         build(self, text)
         """
 
         try:
-            self.parser.build("nothing good here")
+            self.parser.parse("nothing good here")
         except ValueError:
             pass
         else:
             raise AssertionError("ValueError was not raised")
 
         try:
-            self.parser.build("MOV ;")
+            self.parser.parse("MOV ;")
         except ValueError:
             pass
         else:
             raise AssertionError("ValueError was not raised")
 
         try:
-            self.parser.build(":START: ")
+            self.parser.parse(":START: ")
         except ValueError:
             pass
         else:
@@ -128,24 +113,19 @@ class TestParser(unittest.TestCase):
         """
 
         instruction = self.parser._findInstructionCode("Ins", ["ACTI"], b'')
-        correctInstruction = 0b11110001
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b11110001,)))
 
         instruction = self.parser._findInstructionCode("Ins", ["DACTI"], b'')
-        correctInstruction = 0b11110010
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b11110010,)))
 
         instruction = self.parser._findInstructionCode("Ins", ["HIRET"], b'')
-        correctInstruction = 0b11110011
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b11110011,)))
 
         instruction = self.parser._findInstructionCode("Ins", ["NOP"], b'')
-        correctInstruction = 0b11111111
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b11111111,)))
 
         instruction = self.parser._findInstructionCode("Ins", ["RET"], b'')
-        correctInstruction = 0b11110000
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b11110000,)))
 
     def test_findInstructionCodeInsError(self):
         try:
@@ -170,28 +150,22 @@ class TestParser(unittest.TestCase):
         """
 
         instruction = self.parser._findInstructionCode("InsReg", ["CALL", "$B"], b'')
-        correctInstruction = 0b01110010
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b01110010,)))
 
         instruction = self.parser._findInstructionCode("InsReg", ["INT", "$B"], b'')
-        correctInstruction = 0b01110110
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b01110110,)))
 
         instruction = self.parser._findInstructionCode("InsReg", ["NOT", "$B"], b'')
-        correctInstruction = 0b01110000
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b01110000,)))
 
         instruction = self.parser._findInstructionCode("InsReg", ["POP", "$C"], b'')
-        correctInstruction = 0b01110100
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b01110100,)))
 
         instruction = self.parser._findInstructionCode("InsReg", ["PUSH", "$C"], b'')
-        correctInstruction = 0b01110011
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b01110011,)))
 
         instruction = self.parser._findInstructionCode("InsReg", ["SIVR", "$B"], b'')
-        correctInstruction = 0b01110101
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b01110101,)))
 
     def test_findInstructionCodeInsRegError(self):
 
@@ -284,24 +258,19 @@ class TestParser(unittest.TestCase):
         """
 
         instruction = self.parser._findInstructionCode("InsImm", ["CALL", "#4"], b'')
-        correctInstruction = 0b10000010
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b10000010,)))
 
         instruction = self.parser._findInstructionCode("InsImm", ["CALL", "function"], b'')
-        correctInstruction = 0b10000010
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b10000010,)))
 
         instruction = self.parser._findInstructionCode("InsImm", ["INT", "#4"], b'')
-        correctInstruction = 0b10000011
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b10000011,)))
 
         instruction = self.parser._findInstructionCode("InsImm", ["PUSH", "#4"], b'')
-        correctInstruction = 0b10000001
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b10000001,)))
 
         instruction = self.parser._findInstructionCode("InsImm", ["PUSH", "label"], b'')
-        correctInstruction = 0b10000001
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b10000001,)))
 
     def test_findInstructionCodeInsImmError(self):
         """
@@ -332,44 +301,34 @@ class TestParser(unittest.TestCase):
         """
 
         instruction = self.parser._findInstructionCode("InsImmReg", ["ADD", "#4", "$C"], b'')
-        correctInstruction = 0b01100110
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b01100110,)))
 
         instruction = self.parser._findInstructionCode("InsImmReg", ["AND", "#4", "$C"], b'')
-        correctInstruction = 0b01100001
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b01100001,)))
 
         instruction = self.parser._findInstructionCode("InsImmReg", ["CMP", "#4", "$C"], b'')
-        correctInstruction = 0b01101000
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b01101000,)))
 
         instruction = self.parser._findInstructionCode("InsImmReg", ["MOV", "#4", "$B"], b'')
-        correctInstruction = 0b01100000
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b01100000,)))
 
         instruction = self.parser._findInstructionCode("InsImmReg", ["MOV", "label", "$C"], b'')
-        correctInstruction = 0b01100000
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b01100000,)))
 
         instruction = self.parser._findInstructionCode("InsImmReg", ["OR", "#4", "$C"], b'')
-        correctInstruction = 0b01100010
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b01100010,)))
 
         instruction = self.parser._findInstructionCode("InsImmReg", ["SHL", "#4", "$B"], b'')
-        correctInstruction = 0b01100101
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b01100101,)))
 
         instruction = self.parser._findInstructionCode("InsImmReg", ["SHR", "#4", "$B"], b'')
-        correctInstruction = 0b01100100
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b01100100,)))
 
         instruction = self.parser._findInstructionCode("InsImmReg", ["SUB", "#4", "$B"], b'')
-        correctInstruction = 0b01100111
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b01100111,)))
 
         instruction = self.parser._findInstructionCode("InsImmReg", ["XOR", "#4", "$B"], b'')
-        correctInstruction = 0b01100011
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b01100011,)))
 
     def test_findInstructionCodeInsImmRegError(self):
         """
@@ -400,8 +359,7 @@ class TestParser(unittest.TestCase):
         """
 
         instruction = self.parser._findInstructionCode("InsWidthImmImm", ["MEMW", "[1]", "#4", "#6"], b'')
-        correctInstruction = 0b00110000
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b00110000,)))
 
     def test_findInstructionCodeInsWidthImmImmError(self):
         """
@@ -432,12 +390,10 @@ class TestParser(unittest.TestCase):
         """
 
         instruction = self.parser._findInstructionCode("InsWidthImmReg", ["MEMR", "[1]", "#4", "$C"], b'')
-        correctInstruction = 0b00000001
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b00000001,)))
 
         instruction = self.parser._findInstructionCode("InsWidthImmReg", ["MEMW", "[1]", "#4", "$C"], b'')
-        correctInstruction = 0b00000000
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b00000000,)))
 
     def test_findInstructionCodeInsWidthImmRegError(self):
         """
@@ -468,8 +424,7 @@ class TestParser(unittest.TestCase):
         """
 
         instruction = self.parser._findInstructionCode("InsWidthRegImm", ["MEMW", "[1]", "$C", "#4"], b'')
-        correctInstruction = 0b00100000
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b00100000,)))
 
     def test_findInstructionCodeInsWidthRegImmError(self):
         """
@@ -500,12 +455,10 @@ class TestParser(unittest.TestCase):
         """
 
         instruction = self.parser._findInstructionCode("InsWidthRegReg", ["MEMR", "[1]", "$B", "$C"], b'')
-        correctInstruction = 0b00010000
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b00010000,)))
 
         instruction = self.parser._findInstructionCode("InsWidthRegReg", ["MEMW", "[1]", "$C", "$B"], b'')
-        correctInstruction = 0b00010001
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b00010001,)))
 
     def test_findInstructionCodeInsWidthRegRegError(self):
         """
@@ -536,20 +489,16 @@ class TestParser(unittest.TestCase):
         """
 
         instruction = self.parser._findInstructionCode("InsFlagImm", ["JMP", "<>", "#4"], b'')
-        correctInstruction = 0b01000001
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b01000001,)))
 
         instruction = self.parser._findInstructionCode("InsFlagImm", ["JMP", "$B", "label"], b'')
-        correctInstruction = 0b01000001
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b01000001,)))
 
         instruction = self.parser._findInstructionCode("InsFlagImm", ["JMPR", "<>", "#4"], b'')
-        correctInstruction = 0b01000000
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b01000000,)))
 
         instruction = self.parser._findInstructionCode("InsFlagImm", ["SFSTOR", "<L>", "#4"], b'')
-        correctInstruction = 0b01000010
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b01000010,)))
 
     def test_findInstructionCodeInsFlagImmError(self):
         """
@@ -580,16 +529,13 @@ class TestParser(unittest.TestCase):
         """
 
         instruction = self.parser._findInstructionCode("InsFlagReg", ["JMP", "<>", "$C"], b'')
-        correctInstruction = 0b01010001
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b01010001,)))
 
         instruction = self.parser._findInstructionCode("InsFlagReg", ["JMPR", "<>", "$C"], b'')
-        correctInstruction = 0b01010000
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b01010000,)))
 
         instruction = self.parser._findInstructionCode("InsFlagReg", ["SFSTOR", "<E>", "$C"], b'')
-        correctInstruction = 0b01010010
-        self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(instruction, bytes((0b01010010,)))
 
     def test_findInstructionCodeInsFlagRegError(self):
         """
@@ -720,7 +666,7 @@ class TestParser(unittest.TestCase):
         self.assertEqual(flag, 2)
 
         text = "start:"
-        expectedOutput = "start"
+        expectedOutput = "START"
         ins, flag = self.parser._evaluateIndicatorData(text, text.split()[0], text.split(), b'', 0)
         self.assertEqual(ins, expectedOutput)
         self.assertEqual(flag, 1)
@@ -821,7 +767,7 @@ class TestParser(unittest.TestCase):
         else:
             raise AssertionError("ValueError was not raised")
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsACTI(self):
+    def test_buildBinaryCodeACTI(self):
         """
         Tests the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -830,11 +776,10 @@ class TestParser(unittest.TestCase):
 
         text = "ACTI"
         ins = self.parser._findInstructionCode("Ins", ["ACTI"], b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE0", [], ins)
-        expectedOutput = 0b11110001
-        self.assertEqual(instruction, bytes((expectedOutput,)))
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE0", [], ins)
+        self.assertEqual(instruction, bytes((0b11110001,)))
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsADD(self):
+    def test_buildBinaryCodeADD(self):
         """
         Tests the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -844,19 +789,18 @@ class TestParser(unittest.TestCase):
         text = "ADD $B $C"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsRegReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE2", arglist, ins)
-        expectedOutput = bytes((0b10010010,)) + bytes((0b00010010,))
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE2", arglist, ins)
+        self.assertEqual(instruction, bytes((0b10010010,)) + bytes((0b00010010,)))
 
         text = "ADD #4 $B"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsImmReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE4", arglist, ins)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE4", arglist, ins)
         immediate = 4
         expectedOutput = bytes((0b01100110,)) + immediate.to_bytes(4, byteorder='big') + bytes((0b00000001,))
         self.assertEqual(instruction, expectedOutput)
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsAND(self):
+    def test_buildBinaryCodeAND(self):
         """
         Tests the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -866,19 +810,18 @@ class TestParser(unittest.TestCase):
         text = "AND $B $C"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsRegReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE2", arglist, ins)
-        expectedOutput = bytes((0b10010111,)) + bytes((0b00010010,))
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE2", arglist, ins)
+        self.assertEqual(instruction, bytes((0b10010111,)) + bytes((0b00010010,)))
 
         text = "AND #4 $B"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsImmReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE4", arglist, ins)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE4", arglist, ins)
         immediate = 4
         expectedOutput = bytes((0b01100001,)) + immediate.to_bytes(4, byteorder='big') + bytes((0b00000001,))
         self.assertEqual(instruction, expectedOutput)
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsCALL(self):
+    def test_buildBinaryCodeCALL(self):
         """
         Tests the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -888,14 +831,13 @@ class TestParser(unittest.TestCase):
         text = "CALL $B"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE1", arglist, ins)
-        expectedOutput = bytes((0b01110010,)) + bytes((0b00000001,))
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE1", arglist, ins)
+        self.assertEqual(instruction, bytes((0b01110010,)) + bytes((0b00000001,)))
 
         text = "CALL #4"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsImm", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE3", arglist, ins)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE3", arglist, ins)
         immediate = 4
         expectedOutput = bytes((0b10000010,)) + immediate.to_bytes(4, byteorder='big')
         self.assertEqual(instruction, expectedOutput)
@@ -903,12 +845,11 @@ class TestParser(unittest.TestCase):
         text = "CALL label"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsImm", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE3", arglist, ins)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE3", arglist, ins)
         immediate = 4
-        expectedOutput = bytes((0b10000010,)) + b':label:'
-        self.assertEqual(instruction, expectedOutput)
+        self.assertEqual(instruction, bytes((0b10000010,)) + b':label:')
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsCMP(self):
+    def test_buildBinaryCodeCMP(self):
         """
         Tests the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -918,19 +859,18 @@ class TestParser(unittest.TestCase):
         text = "CMP $B $C"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsRegReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE2", arglist, ins)
-        expectedOutput = bytes((0b10011010,)) + bytes((0b00010010,))
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE2", arglist, ins)
+        self.assertEqual(instruction, bytes((0b10011010,)) + bytes((0b00010010,)))
 
         text = "CMP #4 $C"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsImmReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE4", arglist, ins)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE4", arglist, ins)
         immediate = 4
         expectedOutput = bytes((0b01101000,)) + immediate.to_bytes(4, byteorder='big') + bytes((0b00000010,))
         self.assertEqual(instruction, expectedOutput)
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsDACTI(self):
+    def test_buildBinaryCodeDACTI(self):
         """
         Tests the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -940,11 +880,10 @@ class TestParser(unittest.TestCase):
         text = "DACTI"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("Ins", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE0", arglist, ins)
-        expectedOutput = bytes((0b11110010,))
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE0", arglist, ins)
+        self.assertEqual(instruction, bytes((0b11110010,)))
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsDIV(self):
+    def test_buildBinaryCodeDIV(self):
         """
         Tests the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -954,11 +893,10 @@ class TestParser(unittest.TestCase):
         text = "DIV $B $C"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsRegReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE2", arglist, ins)
-        expectedOutput = bytes((0b10010101,)) + bytes((0b00010010,))
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE2", arglist, ins)
+        self.assertEqual(instruction, bytes((0b10010101,)) + bytes((0b00010010,)))
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsHIRET(self):
+    def test_buildBinaryCodeHIRET(self):
         """
         Tests the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -968,11 +906,10 @@ class TestParser(unittest.TestCase):
         text = "HIRET"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("Ins", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE0", arglist, ins)
-        expectedOutput = bytes((0b11110011,))
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE0", arglist, ins)
+        self.assertEqual(instruction, bytes((0b11110011,)))
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsINT(self):
+    def test_buildBinaryCodeINT(self):
         """
         Tests the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -982,19 +919,18 @@ class TestParser(unittest.TestCase):
         text = "INT $B"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE1", arglist, ins)
-        expectedOutput = bytes((0b01110110,)) + bytes((0b00000001,))
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE1", arglist, ins)
+        self.assertEqual(instruction, bytes((0b01110110,)) + bytes((0b00000001,)))
 
         text = "INT #4"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsImm", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE3", arglist, ins)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE3", arglist, ins)
         immediate = 4
         expectedOutput = bytes((0b10000011,)) + immediate.to_bytes(4, byteorder='big')
         self.assertEqual(instruction, expectedOutput)
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsJMP(self):
+    def test_buildBinaryCodeJMP(self):
         """
         Tests the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -1004,14 +940,13 @@ class TestParser(unittest.TestCase):
         text = "JMP <> $B"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsFlagReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE10", arglist, ins)
-        expectedOutput = bytes((0b01010001,)) + bytes((0b00000001,))
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE10", arglist, ins)
+        self.assertEqual(instruction, bytes((0b01010001,)) + bytes((0b00000001,)))
 
         text = "JMP <> #4"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsFlagImm", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE9", arglist, ins)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE9", arglist, ins)
         immediate = 4
         expectedOutput = bytes((0b01000001,)) + bytes((0b00000000,)) + immediate.to_bytes(4, byteorder='big')
         self.assertEqual(instruction, expectedOutput)
@@ -1019,12 +954,11 @@ class TestParser(unittest.TestCase):
         text = "JMP <E> label"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsFlagImm", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE9", arglist, ins)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE9", arglist, ins)
         immediate = 4
-        expectedOutput = bytes((0b01000001,)) + bytes((0b00000100,)) + b':label:'
-        self.assertEqual(instruction, expectedOutput)
+        self.assertEqual(instruction, bytes((0b01000001,)) + bytes((0b00000100,)) + b':label:')
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsJMPR(self):
+    def test_buildBinaryCodeJMPR(self):
         """
         Tests the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -1034,19 +968,18 @@ class TestParser(unittest.TestCase):
         text = "JMPR <> $B"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsFlagReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE10", arglist, ins)
-        expectedOutput = bytes((0b01010000,)) + bytes((0b00000001,))
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE10", arglist, ins)
+        self.assertEqual(instruction, bytes((0b01010000,)) + bytes((0b00000001,)))
 
         text = "JMPR <> #4"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsFlagImm", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE9", arglist, ins)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE9", arglist, ins)
         immediate = 4
         expectedOutput = bytes((0b01000000,)) + bytes((0b00000000,)) + immediate.to_bytes(4, byteorder='big')
         self.assertEqual(instruction, expectedOutput)
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsMEMR(self):
+    def test_buildBinaryCodeMEMR(self):
         """
         Tests the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -1056,19 +989,18 @@ class TestParser(unittest.TestCase):
         text = "MEMR [1] $B $C"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsWidthRegReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE8", arglist, ins)
-        expectedOutput = bytes((0b00010000,)) + bytes((0b00010001,)) + bytes((0b00000010,))
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE8", arglist, ins)
+        self.assertEqual(instruction, bytes((0b00010000,)) + bytes((0b00010001,)) + bytes((0b00000010,)))
 
         text = "MEMR [1] #4 $B"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsWidthImmReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE6", arglist, ins)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE6", arglist, ins)
         immediate = 4
         expectedOutput = bytes((0b00000001,)) + bytes((0b00010001,)) + immediate.to_bytes(4, byteorder='big')
         self.assertEqual(instruction, expectedOutput)
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsMEMW(self):
+    def test_buildBinaryCodeMEMW(self):
         """
         Tests the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -1078,14 +1010,13 @@ class TestParser(unittest.TestCase):
         text = "MEMW [1] $B $C"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsWidthRegReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE8", arglist, ins)
-        expectedOutput = bytes((0b00010001,)) + bytes((0b00010001,)) + bytes((0b00000010,))
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE8", arglist, ins)
+        self.assertEqual(instruction, bytes((0b00010001,)) + bytes((0b00010001,)) + bytes((0b00000010,)))
 
         text = "MEMW [1] #4 $B"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsWidthImmReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE6", arglist, ins)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE6", arglist, ins)
         immediate = 4
         expectedOutput = bytes((0b00000000,)) + bytes((0b00010001,)) + immediate.to_bytes(4, byteorder='big')
         self.assertEqual(instruction, expectedOutput)
@@ -1093,7 +1024,7 @@ class TestParser(unittest.TestCase):
         text = "MEMW [1] $B #4"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsWidthRegImm", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE7", arglist, ins)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE7", arglist, ins)
         immediate = 4
         expectedOutput = bytes((0b00100000,)) + bytes((0b00010001,)) + immediate.to_bytes(4, byteorder='big')
         self.assertEqual(instruction, expectedOutput)
@@ -1101,13 +1032,13 @@ class TestParser(unittest.TestCase):
         text = "MEMW [1] #4 #6"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsWidthImmImm", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE5", arglist, ins)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE5", arglist, ins)
         immediate, immediate2 = 4, 6
         expectedOutput = bytes((0b00110000,)) + bytes((0b00000001,)) + immediate.to_bytes(4, byteorder='big') + \
                                                                        immediate2.to_bytes(4, byteorder='big')
         self.assertEqual(instruction, expectedOutput)
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsMOV(self):
+    def test_buildBinaryCodeMOV(self):
         """
         Tests the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -1117,14 +1048,13 @@ class TestParser(unittest.TestCase):
         text = "MOV $B $C"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsRegReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE2", arglist, ins)
-        expectedOutput = bytes((0b10011011,)) + bytes((0b00010010,))
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE2", arglist, ins)
+        self.assertEqual(instruction, bytes((0b10011011,)) + bytes((0b00010010,)))
 
         text = "MOV #4 $B"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsImmReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE4", arglist, ins)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE4", arglist, ins)
         immediate = 4
         expectedOutput = bytes((0b01100000,)) + immediate.to_bytes(4, byteorder='big') + bytes((0b00000001,))
         self.assertEqual(instruction, expectedOutput)
@@ -1132,11 +1062,10 @@ class TestParser(unittest.TestCase):
         text = "MOV label $B"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsImmReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE4", arglist, ins)
-        expectedOutput = bytes((0b01100000,)) + b':label:' + bytes((0b00000001,))
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE4", arglist, ins)
+        self.assertEqual(instruction, bytes((0b01100000,)) + b':label:' + bytes((0b00000001,)))
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsMUL(self):
+    def test_buildBinaryCodeMUL(self):
         """
         Tests the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -1146,11 +1075,10 @@ class TestParser(unittest.TestCase):
         text = "MUL $B $C"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsRegReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE2", arglist, ins)
-        expectedOutput = bytes((0b10010100,)) + bytes((0b00010010,))
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE2", arglist, ins)
+        self.assertEqual(instruction, bytes((0b10010100,)) + bytes((0b00010010,)))
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsNOP(self):
+    def test_buildBinaryCodeNOP(self):
         """
         Tests the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -1160,11 +1088,10 @@ class TestParser(unittest.TestCase):
         text = "NOP"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("Ins", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE0", arglist, ins)
-        expectedOutput = bytes((0b11111111,))
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE0", arglist, ins)
+        self.assertEqual(instruction, bytes((0b11111111,)))
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsNOT(self):
+    def test_buildBinaryCodeNOT(self):
         """
         Tests the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -1174,11 +1101,10 @@ class TestParser(unittest.TestCase):
         text = "NOT $B"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE1", arglist, ins)
-        expectedOutput = bytes((0b01110000,)) + bytes((0b00000001,))
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE1", arglist, ins)
+        self.assertEqual(instruction, bytes((0b01110000,)) + bytes((0b00000001,)))
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsOR(self):
+    def test_buildBinaryCodeOR(self):
         """
         Tests the method:
          _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -1188,19 +1114,18 @@ class TestParser(unittest.TestCase):
         text = "OR $B $C"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsRegReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE2", arglist, ins)
-        expectedOutput = bytes((0b10011000,)) + bytes((0b00010010,))
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE2", arglist, ins)
+        self.assertEqual(instruction, bytes((0b10011000,)) + bytes((0b00010010,)))
 
         text = "OR #4 $B"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsImmReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE4", arglist, ins)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE4", arglist, ins)
         immediate = 4
         expectedOutput = bytes((0b01100010,)) + immediate.to_bytes(4, byteorder='big') + bytes((0b00000001,))
         self.assertEqual(instruction, expectedOutput)
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsPOP(self):
+    def test_buildBinaryCodePOP(self):
         """
         Tests the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -1210,11 +1135,10 @@ class TestParser(unittest.TestCase):
         text = "POP $B"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE1", arglist, ins)
-        expectedOutput = bytes((0b01110100,)) + bytes((0b00000001,))
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE1", arglist, ins)
+        self.assertEqual(instruction, bytes((0b01110100,)) + bytes((0b00000001,)))
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsPUSH(self):
+    def test_buildBinaryCodePUSH(self):
         """
         Tests the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -1224,14 +1148,13 @@ class TestParser(unittest.TestCase):
         text = "PUSH $B"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE1", arglist, ins)
-        expectedOutput = bytes((0b01110011,)) + bytes((0b00000001,))
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE1", arglist, ins)
+        self.assertEqual(instruction, bytes((0b01110011,)) + bytes((0b00000001,)))
 
         text = "PUSH #4"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsImm", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE3", arglist, ins)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE3", arglist, ins)
         immediate = 4
         expectedOutput = bytes((0b10000001,)) + immediate.to_bytes(4, byteorder='big')
         self.assertEqual(instruction, expectedOutput)
@@ -1239,11 +1162,10 @@ class TestParser(unittest.TestCase):
         text = "PUSH test"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsImm", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE3", arglist, ins)
-        expectedOutput = bytes((0b10000001,)) + b':test:'
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE3", arglist, ins)
+        self.assertEqual(instruction, bytes((0b10000001,)) + b':test:')
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsRET(self):
+    def test_buildBinaryCodeRET(self):
         """
         Tests the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -1253,11 +1175,10 @@ class TestParser(unittest.TestCase):
         text = "RET"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("Ins", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE0", arglist, ins)
-        expectedOutput = bytes((0b11110000,))
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE0", arglist, ins)
+        self.assertEqual(instruction, bytes((0b11110000,)))
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsSFSTOR(self):
+    def test_buildBinaryCodeSFSTOR(self):
         """
         Tests the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -1267,19 +1188,18 @@ class TestParser(unittest.TestCase):
         text = "SFSTOR <E> $B"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsFlagReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE10", arglist, ins)
-        expectedOutput = bytes((0b01010010,)) + bytes((0b01000001,))
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE10", arglist, ins)
+        self.assertEqual(instruction, bytes((0b01010010,)) + bytes((0b01000001,)))
 
         text = "SFSTOR <LH> #4"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsFlagImm", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE9", arglist, ins)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE9", arglist, ins)
         immediate = 4
         expectedOutput = bytes((0b01000010,)) + bytes((0b00000011,)) + immediate.to_bytes(4, byteorder='big')
         self.assertEqual(instruction, expectedOutput)
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsSIVR(self):
+    def test_buildBinaryCodeSIVR(self):
         """
         Tests the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -1289,11 +1209,10 @@ class TestParser(unittest.TestCase):
         text = "SIVR $B"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE1", arglist, ins)
-        expectedOutput = bytes((0b01110101,)) + bytes((0b00000001,))
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE1", arglist, ins)
+        self.assertEqual(instruction, bytes((0b01110101,)) + bytes((0b00000001,)))
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsSHL(self):
+    def test_buildBinaryCodeSHL(self):
         """
         Tests the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -1303,19 +1222,18 @@ class TestParser(unittest.TestCase):
         text = "SHL $B $C"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsRegReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE2", arglist, ins)
-        expectedOutput = bytes((0b10010110,)) + bytes((0b00010010,))
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE2", arglist, ins)
+        self.assertEqual(instruction, bytes((0b10010110,)) + bytes((0b00010010,)))
 
         text = "SHL #4 $B"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsImmReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE4", arglist, ins)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE4", arglist, ins)
         immediate = 4
         expectedOutput = bytes((0b01100101,)) + immediate.to_bytes(4, byteorder='big') + bytes((0b00000001,))
         self.assertEqual(instruction, expectedOutput)
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsSHR(self):
+    def test_buildBinaryCodeSHR(self):
         """
         Tests the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -1325,19 +1243,18 @@ class TestParser(unittest.TestCase):
         text = "SHR $B $C"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsRegReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE2", arglist, ins)
-        expectedOutput = bytes((0b10011001,)) + bytes((0b00010010,))
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE2", arglist, ins)
+        self.assertEqual(instruction, bytes((0b10011001,)) + bytes((0b00010010,)))
 
         text = "SHR #4 $B"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsImmReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE4", arglist, ins)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE4", arglist, ins)
         immediate = 4
         expectedOutput = bytes((0b01100100,)) + immediate.to_bytes(4, byteorder='big') + bytes((0b00000001,))
         self.assertEqual(instruction, expectedOutput)
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsSUB(self):
+    def test_buildBinaryCodeSUB(self):
         """
         Tests the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -1347,19 +1264,18 @@ class TestParser(unittest.TestCase):
         text = "SUB $B $C"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsRegReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE2", arglist, ins)
-        expectedOutput = bytes((0b10010011,)) + bytes((0b00010010,))
-        self.assertEqual(instruction, expectedOutput)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE2", arglist, ins)
+        self.assertEqual(instruction, bytes((0b10010011,)) + bytes((0b00010010,)))
 
         text = "SUB #4 $B"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsImmReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE4", arglist, ins)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE4", arglist, ins)
         immediate = 4
         expectedOutput = bytes((0b01100111,)) + immediate.to_bytes(4, byteorder='big') + bytes((0b00000001,))
         self.assertEqual(instruction, expectedOutput)
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsXOR(self):
+    def test_buildBinaryCodeXOR(self):
         """
         Tests the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -1369,19 +1285,19 @@ class TestParser(unittest.TestCase):
         text = "XOR $B $C"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsRegReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE2", arglist, ins)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE2", arglist, ins)
         expectedOutput = bytes((0b10010000,)) + bytes((0b00010010,))
-        self.assertEqual(instruction, expectedOutput)
+        self.assertEqual(instruction, bytes((0b10010000,)) + bytes((0b00010010,)))
 
         text = "XOR #4 $B"
         arglist = text.split()[1:]
         ins = self.parser._findInstructionCode("InsImmReg", text.split(), b'')
-        instruction = self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE4", arglist, ins)
+        instruction = self.parser._buildBinaryCode(text.split()[0], "STATE4", arglist, ins)
         immediate = 4
         expectedOutput = bytes((0b01100011,)) + immediate.to_bytes(4, byteorder='big') + bytes((0b00000001,))
         self.assertEqual(instruction, expectedOutput)
 
-    def test_buildBinaryCodeFromInstructionAndArgumentsError(self):
+    def test_buildBinaryCodeError(self):
         """
         Tests ValueErrors for the method:
         _buildBinaryCodeFromInstructionAndArguments(self, ins, state, arglist, instruction)
@@ -1392,7 +1308,7 @@ class TestParser(unittest.TestCase):
         ins = self.parser._findInstructionCode("InsImmReg", text.split(), b'')
 
         try:
-            self.parser._buildBinaryCodeFromInstructionAndArguments(text.split()[0], "STATE11", arglist, ins)
+            self.parser._buildBinaryCode(text.split()[0], "STATE11", arglist, ins)
         except ValueError:
             pass
         else:
@@ -1403,50 +1319,50 @@ class TestParser(unittest.TestCase):
         Test the method:
         translateTextFlagsToCodeFlags(self, textFlags):
         """
-        self.assertEqual(0b000, self.parser.translateTextFlagsToCodeFlags(""))
-        self.assertEqual(0b100, self.parser.translateTextFlagsToCodeFlags("Z"))  # Flag (Z)ero is set
-        self.assertEqual(0b100, self.parser.translateTextFlagsToCodeFlags("E"))  # Flag (Z)ero is set
-        self.assertEqual(0b010, self.parser.translateTextFlagsToCodeFlags("L"))  # Flag (L)ower is set
-        self.assertEqual(0b110, self.parser.translateTextFlagsToCodeFlags("LE"))  # Flag (L)ower and Z(ero) are set
-        self.assertEqual(0b110, self.parser.translateTextFlagsToCodeFlags("LZ"))  # Flag (L)ower and Z(ero) are set
-        self.assertEqual(0b001, self.parser.translateTextFlagsToCodeFlags("H"))  # FLAG (H)igher is set
-        self.assertEqual(0b101, self.parser.translateTextFlagsToCodeFlags("HE"))  # FLAG (H)igher and Z(ero) are set
-        self.assertEqual(0b101, self.parser.translateTextFlagsToCodeFlags("HZ"))  # FLAG (H)igher and Z(ero) are set
-        self.assertRaises(ValueError, self.parser.translateTextFlagsToCodeFlags, "F")  # Invalid flag
+        self.assertEqual(0b000, self.parser.translateTextFlags(""))
+        self.assertEqual(0b100, self.parser.translateTextFlags("Z"))  # Flag (Z)ero is set
+        self.assertEqual(0b100, self.parser.translateTextFlags("E"))  # Flag (Z)ero is set
+        self.assertEqual(0b010, self.parser.translateTextFlags("L"))  # Flag (L)ower is set
+        self.assertEqual(0b110, self.parser.translateTextFlags("LE"))  # Flag (L)ower and Z(ero) are set
+        self.assertEqual(0b110, self.parser.translateTextFlags("LZ"))  # Flag (L)ower and Z(ero) are set
+        self.assertEqual(0b001, self.parser.translateTextFlags("H"))  # FLAG (H)igher is set
+        self.assertEqual(0b101, self.parser.translateTextFlags("HE"))  # FLAG (H)igher and Z(ero) are set
+        self.assertEqual(0b101, self.parser.translateTextFlags("HZ"))  # FLAG (H)igher and Z(ero) are set
+        self.assertRaises(ValueError, self.parser.translateTextFlags, "F")  # Invalid flag
 
     def test_translateTextImmediateToImmediate(self):
         """
         Test the method:
         translateTextImmediateToImmediate(self, textImmediate: str=""):
         """
-        self.assertEqual(0x0, self.parser.translateTextImmediateToImmediate(textImmediate="0"))
-        self.assertEqual(((0b1 ^ 0xFFFFFFFF) + 1), self.parser.translateTextImmediateToImmediate(textImmediate="-1"))
-        self.assertEqual(0b11, self.parser.translateTextImmediateToImmediate(textImmediate="0b11"))
-        self.assertEqual(0xFF, self.parser.translateTextImmediateToImmediate(textImmediate="0xFF"))
-        self.assertRaises(ValueError, self.parser.translateTextImmediateToImmediate, "0xAAFFFFFFFF")
+        self.assertEqual(0x0, self.parser.translateTextImmediate(textImmediate="0"))
+        self.assertEqual(((0b1 ^ 0xFFFFFFFF) + 1), self.parser.translateTextImmediate(textImmediate="-1"))
+        self.assertEqual(0b11, self.parser.translateTextImmediate(textImmediate="0b11"))
+        self.assertEqual(0xFF, self.parser.translateTextImmediate(textImmediate="0xFF"))
+        self.assertRaises(ValueError, self.parser.translateTextImmediate, "0xAAFFFFFFFF")
 
     def test_translateRegisterNameToRegisterCode(self):
         """
         Test the method:
         translateRegisterNameToRegisterCode(self, registerName: str=""):
         """
-        self.assertEqual(0b00, self.parser.translateRegisterNameToRegisterCode(registerName="A"))
-        self.assertEqual(0b01, self.parser.translateRegisterNameToRegisterCode(registerName="B"))
-        self.assertEqual(0b10, self.parser.translateRegisterNameToRegisterCode(registerName="C"))
-        self.assertEqual(0b11, self.parser.translateRegisterNameToRegisterCode(registerName="D"))
-        self.assertEqual(0b100, self.parser.translateRegisterNameToRegisterCode(registerName="E"))
-        self.assertEqual(0b101, self.parser.translateRegisterNameToRegisterCode(registerName="F"))
-        self.assertEqual(0b110, self.parser.translateRegisterNameToRegisterCode(registerName="G"))
-        self.assertEqual(0b111, self.parser.translateRegisterNameToRegisterCode(registerName="S"))
-        self.assertEqual(0b1000, self.parser.translateRegisterNameToRegisterCode(registerName="A2"))
-        self.assertEqual(0b1001, self.parser.translateRegisterNameToRegisterCode(registerName="B2"))
-        self.assertEqual(0b1010, self.parser.translateRegisterNameToRegisterCode(registerName="C2"))
-        self.assertEqual(0b1011, self.parser.translateRegisterNameToRegisterCode(registerName="D2"))
-        self.assertEqual(0b1100, self.parser.translateRegisterNameToRegisterCode(registerName="E2"))
-        self.assertEqual(0b1101, self.parser.translateRegisterNameToRegisterCode(registerName="F2"))
-        self.assertEqual(0b1110, self.parser.translateRegisterNameToRegisterCode(registerName="G2"))
-        self.assertEqual(0b1111, self.parser.translateRegisterNameToRegisterCode(registerName="S2"))
-        self.assertRaises(ValueError, self.parser.translateRegisterNameToRegisterCode, "x")  # Invalid register
+        self.assertEqual(0b00, self.parser.translateRegisterName(registerName="A"))
+        self.assertEqual(0b01, self.parser.translateRegisterName(registerName="B"))
+        self.assertEqual(0b10, self.parser.translateRegisterName(registerName="C"))
+        self.assertEqual(0b11, self.parser.translateRegisterName(registerName="D"))
+        self.assertEqual(0b100, self.parser.translateRegisterName(registerName="E"))
+        self.assertEqual(0b101, self.parser.translateRegisterName(registerName="F"))
+        self.assertEqual(0b110, self.parser.translateRegisterName(registerName="G"))
+        self.assertEqual(0b111, self.parser.translateRegisterName(registerName="S"))
+        self.assertEqual(0b1000, self.parser.translateRegisterName(registerName="A2"))
+        self.assertEqual(0b1001, self.parser.translateRegisterName(registerName="B2"))
+        self.assertEqual(0b1010, self.parser.translateRegisterName(registerName="C2"))
+        self.assertEqual(0b1011, self.parser.translateRegisterName(registerName="D2"))
+        self.assertEqual(0b1100, self.parser.translateRegisterName(registerName="E2"))
+        self.assertEqual(0b1101, self.parser.translateRegisterName(registerName="F2"))
+        self.assertEqual(0b1110, self.parser.translateRegisterName(registerName="G2"))
+        self.assertEqual(0b1111, self.parser.translateRegisterName(registerName="S2"))
+        self.assertRaises(ValueError, self.parser.translateRegisterName, "x")  # Invalid register
 
 
 

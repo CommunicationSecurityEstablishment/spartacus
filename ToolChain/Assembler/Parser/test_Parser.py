@@ -112,20 +112,27 @@ class TestParser(unittest.TestCase):
         for instruction in STATE0 (Ins)
         """
 
+        self.parser.relativeAddressCounter = 0
+
         instruction = self.parser._findInstructionCode("Ins", ["ACTI"], b'')
         self.assertEqual(instruction, bytes((0b11110001,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 1)
 
         instruction = self.parser._findInstructionCode("Ins", ["DACTI"], b'')
         self.assertEqual(instruction, bytes((0b11110010,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 2)
 
         instruction = self.parser._findInstructionCode("Ins", ["HIRET"], b'')
         self.assertEqual(instruction, bytes((0b11110011,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 3)
 
         instruction = self.parser._findInstructionCode("Ins", ["NOP"], b'')
         self.assertEqual(instruction, bytes((0b11111111,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 4)
 
         instruction = self.parser._findInstructionCode("Ins", ["RET"], b'')
         self.assertEqual(instruction, bytes((0b11110000,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 5)
 
     def test_findInstructionCodeInsError(self):
         try:
@@ -149,23 +156,31 @@ class TestParser(unittest.TestCase):
         for instruction in STATE1 (InsReg)
         """
 
+        self.parser.relativeAddressCounter = 0
+
         instruction = self.parser._findInstructionCode("InsReg", ["CALL", "$B"], b'')
         self.assertEqual(instruction, bytes((0b01110010,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 2)
 
         instruction = self.parser._findInstructionCode("InsReg", ["INT", "$B"], b'')
         self.assertEqual(instruction, bytes((0b01110110,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 4)
 
         instruction = self.parser._findInstructionCode("InsReg", ["NOT", "$B"], b'')
         self.assertEqual(instruction, bytes((0b01110000,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 6)
 
         instruction = self.parser._findInstructionCode("InsReg", ["POP", "$C"], b'')
         self.assertEqual(instruction, bytes((0b01110100,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 8)
 
         instruction = self.parser._findInstructionCode("InsReg", ["PUSH", "$C"], b'')
         self.assertEqual(instruction, bytes((0b01110011,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 10)
 
         instruction = self.parser._findInstructionCode("InsReg", ["SIVR", "$B"], b'')
         self.assertEqual(instruction, bytes((0b01110101,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 12)
 
     def test_findInstructionCodeInsRegError(self):
 
@@ -190,49 +205,62 @@ class TestParser(unittest.TestCase):
         for instruction in STATE2 (InsRegReg)
         """
 
+        self.parser.relativeAddressCounter = 0
+
         instruction = self.parser._findInstructionCode("InsRegReg", ["ADD", "$B", "$C"], b'')
         correctInstruction = 0b10010010
         self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 2)
 
         instruction = self.parser._findInstructionCode("InsRegReg", ["AND", "$B", "$C"], b'')
         correctInstruction = 0b10010111
         self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 4)
 
         instruction = self.parser._findInstructionCode("InsRegReg", ["CMP", "$B", "$C"], b'')
         correctInstruction = 0b10011010
         self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 6)
 
         instruction = self.parser._findInstructionCode("InsRegReg", ["DIV", "$B", "$C"], b'')
         correctInstruction = 0b10010101
         self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 8)
 
         instruction = self.parser._findInstructionCode("InsRegReg", ["MOV", "$C", "$B"], b'')
         correctInstruction = 0b10011011
         self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 10)
 
         instruction = self.parser._findInstructionCode("InsRegReg", ["MUL", "$C", "$B"], b'')
         correctInstruction = 0b10010100
         self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 12)
 
         instruction = self.parser._findInstructionCode("InsRegReg", ["OR", "$B", "$C"], b'')
         correctInstruction = 0b10011000
         self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 14)
 
         instruction = self.parser._findInstructionCode("InsRegReg", ["SHL", "$C", "$B"], b'')
         correctInstruction = 0b10010110
         self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 16)
 
         instruction = self.parser._findInstructionCode("InsRegReg", ["SHR", "$B", "$C"], b'')
         correctInstruction = 0b10011001
         self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 18)
 
         instruction = self.parser._findInstructionCode("InsRegReg", ["SUB", "$C", "$B"], b'')
         correctInstruction = 0b10010011
         self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 20)
 
         instruction = self.parser._findInstructionCode("InsRegReg", ["XOR", "$C", "$B"], b'')
         correctInstruction = 0b10010000
         self.assertEqual(instruction, bytes((correctInstruction,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 22)
 
     def test_findInstructionCodeInsRegRegError(self):
 
@@ -257,20 +285,27 @@ class TestParser(unittest.TestCase):
         for instruction in STATE3 (InsImm)
         """
 
+        self.parser.relativeAddressCounter = 0
+
         instruction = self.parser._findInstructionCode("InsImm", ["CALL", "#4"], b'')
         self.assertEqual(instruction, bytes((0b10000010,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 5)
 
         instruction = self.parser._findInstructionCode("InsImm", ["CALL", "function"], b'')
         self.assertEqual(instruction, bytes((0b10000010,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 10)
 
         instruction = self.parser._findInstructionCode("InsImm", ["INT", "#4"], b'')
         self.assertEqual(instruction, bytes((0b10000011,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 15)
 
         instruction = self.parser._findInstructionCode("InsImm", ["PUSH", "#4"], b'')
         self.assertEqual(instruction, bytes((0b10000001,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 20)
 
         instruction = self.parser._findInstructionCode("InsImm", ["PUSH", "label"], b'')
         self.assertEqual(instruction, bytes((0b10000001,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 25)
 
     def test_findInstructionCodeInsImmError(self):
         """
@@ -300,35 +335,47 @@ class TestParser(unittest.TestCase):
         for instruction in STATE4 (InsImmReg)
         """
 
+        self.parser.relativeAddressCounter = 0
+
         instruction = self.parser._findInstructionCode("InsImmReg", ["ADD", "#4", "$C"], b'')
         self.assertEqual(instruction, bytes((0b01100110,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 6)
 
         instruction = self.parser._findInstructionCode("InsImmReg", ["AND", "#4", "$C"], b'')
         self.assertEqual(instruction, bytes((0b01100001,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 12)
 
         instruction = self.parser._findInstructionCode("InsImmReg", ["CMP", "#4", "$C"], b'')
         self.assertEqual(instruction, bytes((0b01101000,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 18)
 
         instruction = self.parser._findInstructionCode("InsImmReg", ["MOV", "#4", "$B"], b'')
         self.assertEqual(instruction, bytes((0b01100000,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 24)
 
         instruction = self.parser._findInstructionCode("InsImmReg", ["MOV", "label", "$C"], b'')
         self.assertEqual(instruction, bytes((0b01100000,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 30)
 
         instruction = self.parser._findInstructionCode("InsImmReg", ["OR", "#4", "$C"], b'')
         self.assertEqual(instruction, bytes((0b01100010,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 36)
 
         instruction = self.parser._findInstructionCode("InsImmReg", ["SHL", "#4", "$B"], b'')
         self.assertEqual(instruction, bytes((0b01100101,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 42)
 
         instruction = self.parser._findInstructionCode("InsImmReg", ["SHR", "#4", "$B"], b'')
         self.assertEqual(instruction, bytes((0b01100100,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 48)
 
         instruction = self.parser._findInstructionCode("InsImmReg", ["SUB", "#4", "$B"], b'')
         self.assertEqual(instruction, bytes((0b01100111,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 54)
 
         instruction = self.parser._findInstructionCode("InsImmReg", ["XOR", "#4", "$B"], b'')
         self.assertEqual(instruction, bytes((0b01100011,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 60)
 
     def test_findInstructionCodeInsImmRegError(self):
         """
@@ -358,8 +405,11 @@ class TestParser(unittest.TestCase):
         for instruction in STATE5 (InsWidthImmImm)
         """
 
+        self.parser.relativeAddressCounter = 0
+
         instruction = self.parser._findInstructionCode("InsWidthImmImm", ["MEMW", "[1]", "#4", "#6"], b'')
         self.assertEqual(instruction, bytes((0b00110000,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 10)
 
     def test_findInstructionCodeInsWidthImmImmError(self):
         """
@@ -389,11 +439,15 @@ class TestParser(unittest.TestCase):
         for instruction in STATE6 (InsWidthImmReg)
         """
 
+        self.parser.relativeAddressCounter = 0
+
         instruction = self.parser._findInstructionCode("InsWidthImmReg", ["MEMR", "[1]", "#4", "$C"], b'')
         self.assertEqual(instruction, bytes((0b00000001,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 6)
 
         instruction = self.parser._findInstructionCode("InsWidthImmReg", ["MEMW", "[1]", "#4", "$C"], b'')
         self.assertEqual(instruction, bytes((0b00000000,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 12)
 
     def test_findInstructionCodeInsWidthImmRegError(self):
         """
@@ -423,8 +477,11 @@ class TestParser(unittest.TestCase):
         for instruction in STATE7 (InsWidthRegImm)
         """
 
+        self.parser.relativeAddressCounter = 0
+
         instruction = self.parser._findInstructionCode("InsWidthRegImm", ["MEMW", "[1]", "$C", "#4"], b'')
         self.assertEqual(instruction, bytes((0b00100000,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 6)
 
     def test_findInstructionCodeInsWidthRegImmError(self):
         """
@@ -454,11 +511,15 @@ class TestParser(unittest.TestCase):
         for instruction in STATE8 (InsWidthRegReg)
         """
 
+        self.parser.relativeAddressCounter = 0
+
         instruction = self.parser._findInstructionCode("InsWidthRegReg", ["MEMR", "[1]", "$B", "$C"], b'')
         self.assertEqual(instruction, bytes((0b00010000,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 3)
 
         instruction = self.parser._findInstructionCode("InsWidthRegReg", ["MEMW", "[1]", "$C", "$B"], b'')
         self.assertEqual(instruction, bytes((0b00010001,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 6)
 
     def test_findInstructionCodeInsWidthRegRegError(self):
         """
@@ -488,17 +549,23 @@ class TestParser(unittest.TestCase):
         for instruction in STATE9 (InsFlagImm)
         """
 
+        self.parser.relativeAddressCounter = 0
+
         instruction = self.parser._findInstructionCode("InsFlagImm", ["JMP", "<>", "#4"], b'')
         self.assertEqual(instruction, bytes((0b01000001,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 6)
 
         instruction = self.parser._findInstructionCode("InsFlagImm", ["JMP", "$B", "label"], b'')
         self.assertEqual(instruction, bytes((0b01000001,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 12)
 
         instruction = self.parser._findInstructionCode("InsFlagImm", ["JMPR", "<>", "#4"], b'')
         self.assertEqual(instruction, bytes((0b01000000,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 18)
 
         instruction = self.parser._findInstructionCode("InsFlagImm", ["SFSTOR", "<L>", "#4"], b'')
         self.assertEqual(instruction, bytes((0b01000010,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 24)
 
     def test_findInstructionCodeInsFlagImmError(self):
         """
@@ -528,14 +595,19 @@ class TestParser(unittest.TestCase):
         for instruction in STATE10 (InsFlagReg)
         """
 
+        self.parser.relativeAddressCounter = 0
+
         instruction = self.parser._findInstructionCode("InsFlagReg", ["JMP", "<>", "$C"], b'')
         self.assertEqual(instruction, bytes((0b01010001,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 2)
 
         instruction = self.parser._findInstructionCode("InsFlagReg", ["JMPR", "<>", "$C"], b'')
         self.assertEqual(instruction, bytes((0b01010000,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 4)
 
         instruction = self.parser._findInstructionCode("InsFlagReg", ["SFSTOR", "<E>", "$C"], b'')
         self.assertEqual(instruction, bytes((0b01010010,)))
+        self.assertEqual(self.parser.relativeAddressCounter, 6)
 
     def test_findInstructionCodeInsFlagRegError(self):
         """
@@ -558,7 +630,7 @@ class TestParser(unittest.TestCase):
         else:
             raise AssertionError("ValueError was not raised")
 
-    def test_definestateAndAddRelativeAddress(self):
+    def test_definestate(self):
         """
         Tests the method:
         _definestateAndAddRelativeAddress(self, form)
@@ -566,49 +638,38 @@ class TestParser(unittest.TestCase):
 
         self.parser.relativeAddressCounter = 0
 
-        form = self.parser._definestateAndAddRelativeAddress("Ins")
+        form = self.parser._definestate("Ins")
         self.assertEqual(form, "STATE0")
-        self.assertEqual(self.parser.relativeAddressCounter, 1)
 
-        form = self.parser._definestateAndAddRelativeAddress("InsReg")
+        form = self.parser._definestate("InsReg")
         self.assertEqual(form, "STATE1")
-        self.assertEqual(self.parser.relativeAddressCounter, 3)
 
-        form = self.parser._definestateAndAddRelativeAddress("InsRegReg")
+        form = self.parser._definestate("InsRegReg")
         self.assertEqual(form, "STATE2")
-        self.assertEqual(self.parser.relativeAddressCounter, 5)
 
-        form = self.parser._definestateAndAddRelativeAddress("InsImm")
+        form = self.parser._definestate("InsImm")
         self.assertEqual(form, "STATE3")
-        self.assertEqual(self.parser.relativeAddressCounter, 10)
 
-        form = self.parser._definestateAndAddRelativeAddress("InsImmReg")
+        form = self.parser._definestate("InsImmReg")
         self.assertEqual(form, "STATE4")
-        self.assertEqual(self.parser.relativeAddressCounter, 16)
 
-        form = self.parser._definestateAndAddRelativeAddress("InsWidthImmImm")
+        form = self.parser._definestate("InsWidthImmImm")
         self.assertEqual(form, "STATE5")
-        self.assertEqual(self.parser.relativeAddressCounter, 26)
 
-        form = self.parser._definestateAndAddRelativeAddress("InsWidthImmReg")
+        form = self.parser._definestate("InsWidthImmReg")
         self.assertEqual(form, "STATE6")
-        self.assertEqual(self.parser.relativeAddressCounter, 32)
 
-        form = self.parser._definestateAndAddRelativeAddress("InsWidthRegImm")
+        form = self.parser._definestate("InsWidthRegImm")
         self.assertEqual(form, "STATE7")
-        self.assertEqual(self.parser.relativeAddressCounter, 38)
 
-        form = self.parser._definestateAndAddRelativeAddress("InsWidthRegReg")
+        form = self.parser._definestate("InsWidthRegReg")
         self.assertEqual(form, "STATE8")
-        self.assertEqual(self.parser.relativeAddressCounter, 41)
 
-        form = self.parser._definestateAndAddRelativeAddress("InsFlagImm")
+        form = self.parser._definestate("InsFlagImm")
         self.assertEqual(form, "STATE9")
-        self.assertEqual(self.parser.relativeAddressCounter, 47)
 
-        form = self.parser._definestateAndAddRelativeAddress("InsFlagReg")
+        form = self.parser._definestate("InsFlagReg")
         self.assertEqual(form, "STATE10")
-        self.assertEqual(self.parser.relativeAddressCounter, 49)
 
     def test_definestateAndAddRelativeAddressError(self):
             """
@@ -617,7 +678,7 @@ class TestParser(unittest.TestCase):
             """
 
             try:
-                self.parser._definestateAndAddRelativeAddress("InsFlag")
+                self.parser._definestate("InsFlag")
             except ValueError:
                 pass
             else:
@@ -1314,7 +1375,7 @@ class TestParser(unittest.TestCase):
         else:
             raise AssertionError("ValueError was not raised")
 
-    def test_translateTextFlagsToCodeFlags(self):
+    def test_translateTextFlags(self):
         """
         Test the method:
         translateTextFlagsToCodeFlags(self, textFlags):
@@ -1330,7 +1391,7 @@ class TestParser(unittest.TestCase):
         self.assertEqual(0b101, self.parser.translateTextFlags("HZ"))  # FLAG (H)igher and Z(ero) are set
         self.assertRaises(ValueError, self.parser.translateTextFlags, "F")  # Invalid flag
 
-    def test_translateTextImmediateToImmediate(self):
+    def test_translateTextImmediate(self):
         """
         Test the method:
         translateTextImmediateToImmediate(self, textImmediate: str=""):
@@ -1340,8 +1401,9 @@ class TestParser(unittest.TestCase):
         self.assertEqual(0b11, self.parser.translateTextImmediate(textImmediate="0b11"))
         self.assertEqual(0xFF, self.parser.translateTextImmediate(textImmediate="0xFF"))
         self.assertRaises(ValueError, self.parser.translateTextImmediate, "0xAAFFFFFFFF")
+        self.assertRaises(ValueError, self.parser.translateTextImmediate, "error")
 
-    def test_translateRegisterNameToRegisterCode(self):
+    def test_translateRegisterName(self):
         """
         Test the method:
         translateRegisterNameToRegisterCode(self, registerName: str=""):

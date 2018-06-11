@@ -24,7 +24,22 @@ from CapuaEnvironment.Instruction.Instruction import Instruction
 from CapuaEnvironment.IntructionFetchUnit.InstructionFetchUnit import InstructionFetchUnit
 from CapuaEnvironment.IntructionFetchUnit.FormDescription import formDescription
 from CapuaEnvironment.IOComponent.MemoryIOController import MemoryIOController
-from Configuration.Configuration import REGISTERS, \
+from Configuration.Configuration import REGISTER_A, \
+                                        REGISTER_B, \
+                                        REGISTER_C, \
+                                        REGISTER_D, \
+                                        REGISTER_E, \
+                                        REGISTER_F, \
+                                        REGISTER_G, \
+                                        REGISTER_A2, \
+                                        REGISTER_B2, \
+                                        REGISTER_C2, \
+                                        REGISTER_D2, \
+                                        REGISTER_E2, \
+                                        REGISTER_F2, \
+                                        REGISTER_G2, \
+                                        REGISTER_S, \
+                                        REGISTER_S2, \
                                         MEMORY_END_AT, \
                                         MEMORY_START_AT
 
@@ -189,37 +204,37 @@ class ExecutionUnit:
         :return:
         """
         value &= 0xFFFFFFFF
-        if registerCode == REGISTERS["A"]:
+        if registerCode == REGISTER_A:
             self.A = value
-        elif registerCode == REGISTERS["B"]:
+        elif registerCode == REGISTER_B:
             self.B = value
-        elif registerCode == REGISTERS["C"]:
+        elif registerCode == REGISTER_C:
             self.C = value
-        elif registerCode == REGISTERS["D"]:
+        elif registerCode == REGISTER_D:
             self.D = value
-        elif registerCode == REGISTERS["E"]:
+        elif registerCode == REGISTER_E:
             self.E = value
-        elif registerCode == REGISTERS["F"]:
+        elif registerCode == REGISTER_F:
             self.F = value
-        elif registerCode == REGISTERS["G"]:
+        elif registerCode == REGISTER_G:
             self.G = value
-        elif registerCode == REGISTERS["A2"]:
+        elif registerCode == REGISTER_A2:
             self.A2 = value
-        elif registerCode == REGISTERS["B2"]:
+        elif registerCode == REGISTER_B2:
             self.B2 = value
-        elif registerCode == REGISTERS["C2"]:
+        elif registerCode == REGISTER_C2:
             self.C2 = value
-        elif registerCode == REGISTERS["D2"]:
+        elif registerCode == REGISTER_D2:
             self.D2 = value
-        elif registerCode == REGISTERS["E2"]:
+        elif registerCode == REGISTER_E2:
             self.E2 = value
-        elif registerCode == REGISTERS["F2"]:
+        elif registerCode == REGISTER_F2:
             self.F2 = value
-        elif registerCode == REGISTERS["G2"]:
+        elif registerCode == REGISTER_G2:
             self.G2 = value
-        elif registerCode == REGISTERS["S"]:
+        elif registerCode == REGISTER_S:
             self.S = value
-        elif registerCode == REGISTERS["S2"]:
+        elif registerCode == REGISTER_S2:
             self.S2 = value
         else:
             raise ValueError("Core {} caused an invalid instruction to be executed - GameOver". format(self.name,))
@@ -231,37 +246,37 @@ class ExecutionUnit:
         :param registerCode: int, from 0b00 to 0b11
         :return:
         """
-        if registerCode == REGISTERS["A"]:
+        if registerCode == REGISTER_A:
             register = self.A
-        elif registerCode == REGISTERS["B"]:
+        elif registerCode == REGISTER_B:
             register = self.B
-        elif registerCode == REGISTERS["C"]:
+        elif registerCode == REGISTER_C:
             register = self.C
-        elif registerCode == REGISTERS["D"]:
+        elif registerCode == REGISTER_D:
             register = self.D
-        elif registerCode == REGISTERS["E"]:
+        elif registerCode == REGISTER_E:
             register = self.E
-        elif registerCode == REGISTERS["F"]:
+        elif registerCode == REGISTER_F:
             register = self.F
-        elif registerCode == REGISTERS["G"]:
+        elif registerCode == REGISTER_G:
             register = self.G
-        elif registerCode == REGISTERS["A2"]:
+        elif registerCode == REGISTER_A2:
             register = self.A2
-        elif registerCode == REGISTERS["B2"]:
+        elif registerCode == REGISTER_B2:
             register = self.B2
-        elif registerCode == REGISTERS["C2"]:
+        elif registerCode == REGISTER_C2:
             register = self.C2
-        elif registerCode == REGISTERS["D2"]:
+        elif registerCode == REGISTER_D2:
             register = self.D2
-        elif registerCode == REGISTERS["E2"]:
+        elif registerCode == REGISTER_E2:
             register = self.E2
-        elif registerCode == REGISTERS["F2"]:
+        elif registerCode == REGISTER_F2:
             register = self.F2
-        elif registerCode == REGISTERS["G2"]:
+        elif registerCode == REGISTER_G2:
             register = self.G2
-        elif registerCode == REGISTERS["S"]:
+        elif registerCode == REGISTER_S:
             register = self.S
-        elif registerCode == REGISTERS["S2"]:
+        elif registerCode == REGISTER_S2:
             register = self.S2
         else:
             raise ValueError("Core exception access to invalid register")
@@ -532,8 +547,8 @@ class LogicUnit:
 
         resultA = sourceValue // destinationValue
         resultB = sourceValue % destinationValue
-        self.eu.setRegisterValue(REGISTERS["A"], resultA)
-        self.eu.setRegisterValue(REGISTERS["B"], resultB)
+        self.eu.setRegisterValue(REGISTER_A, resultA)
+        self.eu.setRegisterValue(REGISTER_B, resultB)
 
         return 0
 
@@ -548,7 +563,7 @@ class LogicUnit:
 
         oldAValue = self.eu.A
         # First save the return address
-        popInstruction = Instruction(binaryInstruction=(0b01110100 << 8) | REGISTERS["A"], form=formDescription["InsReg"])
+        popInstruction = Instruction(binaryInstruction=(0b01110100 << 8) | REGISTER_A, form=formDescription["InsReg"])
         self.executeInstruction(popInstruction, hardware=True)
         returnAddress = self.eu.A
         self.executeInstruction(popInstruction, hardware=True)
@@ -793,8 +808,8 @@ class LogicUnit:
         result = sourceValue * destinationValue
         resultA = 0x00000000FFFFFFFF & result
         resultB = 0xFFFFFFFF00000000 & destinationValue
-        self.eu.setRegisterValue(REGISTERS["A"], resultA)
-        self.eu.setRegisterValue(REGISTERS["B"], resultB)
+        self.eu.setRegisterValue(REGISTER_A, resultA)
+        self.eu.setRegisterValue(REGISTER_B, resultB)
 
         return 0
 
@@ -942,7 +957,7 @@ class LogicUnit:
         sfstorInstruction = self.ci
 
         # This will be saved back in the register at the end of the operation
-        destinationPointer = self.eu.getRegisterValue(registerCode=REGISTERS["A"])
+        destinationPointer = self.eu.getRegisterValue(registerCode=REGISTER_A)
 
         if self.ci.sourceImmediate is None:
             sourceValue = self.eu.getRegisterValue(registerCode=self.ci.sourceRegister)
@@ -960,13 +975,13 @@ class LogicUnit:
         # Second step is to compare the data
         cmpInstruction = Instruction(binaryInstruction=(0b01101000 << 8 * 5) |
                                                        (sourceValue << 8 * 1) |
-                                                       REGISTERS["A"],
+                                                       REGISTER_A,
                                      form=formDescription["InsImmReg"])
         # This will cause a modification of the live Flags register
         self.executeInstruction(cmpInstruction)
 
         # Need to make $A be the initial $A again
-        self.eu.setRegisterValue(REGISTERS["A"], destinationPointer)
+        self.eu.setRegisterValue(REGISTER_A, destinationPointer)
 
         # Flags after cmp instruction
         cmpFlags = self.eu.FLAGS

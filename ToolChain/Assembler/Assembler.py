@@ -1,5 +1,31 @@
 #!/usr/bin/env python
 #  -*- coding: <utf-8> -*-
+"""
+This file is part of Spartacus project
+Copyright (C) 2018  CSE
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along
+with this program; if not, write to the Free Software Foundation, Inc.,
+51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+"""
+
+__author__ = "CSE"
+__copyright__ = "Copyright 2018, CSE"
+__credits__ = ["CSE"]
+__license__ = "GPL"
+__version__ = "2.1"
+__maintainer__ = "CSE"
+__status__ = "Dev"
 
 from ToolChain.Assembler.Parser.Parser import Parser
 
@@ -10,10 +36,11 @@ class Assembler:
 
     def __init__(self, inputFile=None, outputFile=None):
         """
-        This allows for simple initialisation of the assembler. It will spawn the required
-        instructionBuilder that will parse the assembly code into binary format.
-        :param inputFile:
-        :param outputFile:
+        This allows for simple initialisation of the assembler. This class reads the input file line by line and sends
+        to the parser for evaluation. Based on the information retrieved, the assembler will sort the information
+        accordingly to write to the .o file.
+        :param inputFile: str, input textfile name to be read and parsed
+        :param outputFile: str, output texfile name to write to output
         """
 
         if type(inputFile) is not str or len(inputFile) is 0:
@@ -43,10 +70,16 @@ class Assembler:
         parser = Parser()                    # Parser object which will return the binary code for instructions
         masterString = b""                   # String that will eventually be our output file
         xmlstring = b""                      # String that will contain the "xml" data at the beginning of the .o file
-        global_list = []                     # Temporary list to hold the names of global(external) symbols
+        globalList = []                      # Temporary list to hold the names of global(external) symbols
         externalList = []                    # Master list of all external symbols to be used by linker
         internalList = []                    # Master list of all internal symbols
         offset = 0                           # Offset used to calculate a label's offset from the beginning of the file
+        lineno = 0                           # Keeps track of which line we're parsing to pinpoint errors
+
+        operand = 0                          # Flag for an operand, meaning parser found a valid instruction
+        localReference = 1                   # Flag for local function, internal symbol
+        globalReference = 2                  # Flag for external function, global symbol
+        comment = 3                          # Flag for comment
 
         file = open(inputFile, mode="r")
         fileLines = file.readlines()
@@ -55,29 +88,30 @@ class Assembler:
         masterString += b"<Text>"
 
         for line in fileLines:
+            lineno += 1
             # If the file isn't empty, process the content
             if line[0] != "\n":
                 # We simply ensure that there is something on the line, not just newline (empty)
-                instruction, offset, label_flag = parser.parse(line)
+                instruction, offset, labelFlag = parser.parse(line)
 
-                if label_flag == 0:
+                if labelFlag == operand:
                     masterString += instruction
 
-                elif label_flag == 1:
-                    label_tuple = (instruction, offset)
-                    internalList.append(label_tuple)
-                    if instruction in global_list:
-                        externalList.append(label_tuple)
+                elif labelFlag == localReference:
+                    labelTuple = (instruction, offset)
+                    internalList.append(labelTuple)
+                    if instruction in globalList:
+                        externalList.append(labelTuple)
 
-                elif label_flag == 2:
-                    global_list.append(instruction)
+                elif labelFlag == globalReference:
+                    globalList.append(instruction)
 
-                elif label_flag == 3:
+                elif labelFlag == comment:
                     # flag for comment, we simply ignore and move on to the next line
                     pass
 
                 else:
-                    raise ValueError("Assembler code error.")
+                    raise ValueError("Couldn't parse instruction at line " + lineno)
 
         masterString += b"</Text>"
 

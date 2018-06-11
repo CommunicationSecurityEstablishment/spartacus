@@ -34,6 +34,24 @@ MEMORY_ARRAY_NUMBER_OF_MEMORY_CELL = 0x100000 * 16  # 1 048 576 * 16 memory cell
 MEMORY_END_AT = MEMORY_START_AT + MEMORY_ARRAY_NUMBER_OF_MEMORY_CELL
 MEMORY_CELL_INITIAL_VALUE = 0XFF  # NOP operation
 
+REGISTER_A = 0b0000
+REGISTER_B = 0b0001
+REGISTER_C = 0b0010
+REGISTER_D = 0b0011
+REGISTER_E = 0b0100
+REGISTER_F = 0b0101
+REGISTER_G = 0b0110
+REGISTER_S = 0b0111
+
+REGISTER_A2 = 0b1000
+REGISTER_B2 = 0b1001
+REGISTER_C2 = 0b1010
+REGISTER_D2 = 0b1011
+REGISTER_E2 = 0b1100
+REGISTER_F2 = 0b1101
+REGISTER_G2 = 0b1110
+REGISTER_S2 = 0b1111
+
 DISPLAY_REFRESH_RATE = 5      # This is in milliseconds
 DISPLAY_FONT_SIZE = 12
 
@@ -55,40 +73,4 @@ VIRTUAL_BOOT_ENABLED = True       # This will enforce booting from the "hard dri
 FIRMWARE_LOAD_ADDRESS = 0x40001000      # Firmware will be loaded at this address when using virtual boot
 FIRMWARE_BINARY_FILE_PATH = "CapuaEnvironment/firmware.bin"
 
-REGISTERS = {
-    "A": 0b0000, "B": 0b0001, "C": 0b0010, "D": 0b0011,
-    "E": 0b0100, "F": 0b0101, "G": 0b0110, "S": 0b0111,
-
-    "A2": 0b1000, "B2": 0b1001, "C2": 0b1010, "D2": 0b1011,
-    "E2": 0b1100, "F2": 0b1101, "G2": 0b1110, "S2": 0b1111
-}
-
-INSTRUCTION_LIST = [
-    "ACTI", "ADD", "AND", "CALL", "CMP", "DACTI", "DIV",
-    "HIRET", "INT", "JMP", "JMPR", "MEMR", "MEMW", "MOV",
-    "MUL", "NOP", "NOT", "NOP","OR", "POP", "PUSH",
-    "RET", "SFSTOR", "SIVR", "SHL", "SHR", "SUB", "XOR"
-]
-
-LABEL_INSTRUCTIONS = [
-    "CALL", "JMP", "MOV", "PUSH"
-]
-
-IDENTIFIER_LIST = [
-    ":", ".GLOBAL", ".DATAALPHA", ".DATANUMERIC", ".DATAMEMREF", ";"
-]
-
-STATE_LIST = {
-    "Ins": ["STATE0", 1],
-    "InsReg": ["STATE1", 2],
-    "InsRegReg": ["STATE2", 2],
-    "InsImm": ["STATE3", 5],
-    "InsImmReg": ["STATE4", 6],
-    "InsWidthImmImm": ["STATE5", 10],
-    "InsWidthImmReg": ["STATE6", 6],
-    "InsWidthRegImm": ["STATE7", 6],
-    "InsWidthRegReg": ["STATE8", 3],
-    "InsFlagImm": ["STATE9", 6],
-    "InsFlagReg": ["STATE10", 2],
-}
 

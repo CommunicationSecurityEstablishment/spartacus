@@ -27,19 +27,38 @@ __version__ = "2.1"
 __maintainer__ = "CSE"
 __status__ = "Dev"
 
-from Configuration.Configuration import REGISTERS, \
-                                        INSTRUCTION_LIST, \
-                                        IDENTIFIER_LIST, \
-                                        LABEL_INSTRUCTIONS, \
-                                        STATE_LIST
+from ToolChain.Assembler.Constants import REGISTERS, \
+                                          INSTRUCTION_LIST, \
+                                          LABEL_INSTRUCTIONS, \
+                                          STATE_LIST, \
+                                          MEMORY_REFERENCE_INDICATORS, \
+                                          EXPORTED_REFERENCE_INDICATOR, \
+                                          DATA_NUMERIC_INDICATOR, \
+                                          DATA_ALPHA_INDICATOR, \
+                                          DATA_MEMORY_REFERENCE, \
+                                          COMMENT_INDICATORS
 
 from CapuaEnvironment.IntructionFetchUnit.FormDescription import formDescription
 from CapuaEnvironment.Instruction.OperationDescription import operationDescription
 
 import struct
+import re
 
 
 class Parser:
+    """
+    This class is used to parse the text format code and build a list of instruction from it.
+    To do so, it has a direct link into CapuaEnvironment instruction information. Those class
+    and description files are directly used in order to help build the binary code required
+    to run code inside of the Capua environment. The steps are as follows:
+    1. Verify if the file name is valid, and that it is not empty.
+    2. Read the file and parse each line into a list to be evaluated one at a time.
+    3. Evaluate each line and, if not an empty line, store instructions and memory references in lists.
+        - Parse each line and determine whether we're dealing with an instruction, memory reference, data, etc.
+        - If an instruction is found, determine all possible forms for this instruction (eg. ins - reg - reg)
+        - Using possible forms for an instruction, determine the correct instruction code based on given arguments.
+    4. Once all info has been evaluated, if correct, we generate the binary code for each instruction
+    """
 
     relativeAddressCounter = 0                # Used to determine memory address of a label at a given point in the file
     lineno = 0                                # Used to pinpoint where ValueErrors are raised
@@ -61,12 +80,13 @@ class Parser:
         dataIdentifier = line[0].upper()        # used for special identifiers such as .dataAlpha, comments etc.
         self.lineno += 1
 
-        if (dataIdentifier in IDENTIFIER_LIST) or (dataIdentifier[0] in IDENTIFIER_LIST) or \
-                                                  (dataIdentifier[-1] in IDENTIFIER_LIST):
-            # First off, we need to determine if this line has a label or global label to be referenced
-            # If so, we can simply return to the Assembler class with the label, the offset, and the appropriate flag
-            instruction, labelFlag = self._evaluateIndicatorData(text, dataIdentifier, line, instruction, labelFlag)
+        # First off, we need to determine if this line has a label or global label to be referenced
+        # If so, we can simply return to the Assembler class with the label, the offset, and the appropriate flag
+        identifierMatch = re.search(r'(\.(\w*))|(\w*:)|(;)', dataIdentifier)
 
+        if identifierMatch:
+            # We had a match for identifier patterns, so we assume there's no instruction.
+            instruction, labelFlag = self._evaluateIndicatorData(text, dataIdentifier, line, instruction, labelFlag)
             return instruction, self.relativeAddressCounter, labelFlag
 
         elif line[0].upper() in INSTRUCTION_LIST:
@@ -80,7 +100,7 @@ class Parser:
             # This will allow us to determine which "state" the instruction belongs to.
             form, arglist = self._evaluateFormBasedOnArguments(line, form, arglist)
             instruction += self._findInstructionCode(form, line, instruction)
-            state = self._definestateAndAddRelativeAddress(form)
+            state = self._definestate(form)
 
             # Finally we evaluate how we will build our binary code. Each state has a distinct pattern we must follow
             instruction = self._buildBinaryCode(line[0], state, arglist, instruction)
@@ -94,6 +114,8 @@ class Parser:
     def _findInstructionCode(self, form, line, instruction):
         """
         Finds the instruction's binary code based on its form, which relies on the arguments after the instruction.
+        Since each instruction + form pair has one distinct instruction length, we also add it here to the
+        relativeAddressCounter.
         :param form: str, the assembled form of the particular instruction (ex: instruction-register-register)
         :param line: str list, our line read from input split into individual arguments
         :param instruction: bytestring, will contain our final binary code passed back to assembler
@@ -103,12 +125,6 @@ class Parser:
         try:
             # We make sure the form is described in the formDescription Class
             insform = formDescription[form]
-
-        except KeyError as e:
-            raise ValueError("Invalid instruction format at line " + str(self.lineno))
-
-        try:
-            # We make sure the instruction is described in the operationDescription Class
             ins = operationDescription[line[0]]
 
         except KeyError as e:
@@ -119,28 +135,29 @@ class Parser:
         for possiblecodes in ins:
             # We shift the binary code by 4 bits to see if we have a match with typeCode for this form
             # ex: typeCode = 0010, possiblecodes = 00101011 would be true since the first 4 bits match.
+            # Once we have our instruction match, we know the size of the instruction and we add to the counter
             if insform["typeCode"] is (possiblecodes >> 4):
                 found = True
+                self.relativeAddressCounter += insform["length"]
                 instruction += bytes((possiblecodes,))
 
         if not found:
             # We shouldn't get to this part since the instruction was in the instruction list. Code error.
             raise ValueError("Invalid instruction format at line " + str(self.lineno))
 
+
         return instruction
 
-    def _definestateAndAddRelativeAddress(self, form):
+    def _definestate(self, form):
         """
         Takes in the form based on instruction and its arguments and determines which form it belongs to.
-        This state contains all possible instructions for that particular form. This method also adds the length of
-        the instruction to the relativeAddressCounter. Each form only has one possible length, so we add it here.
+        This state contains all possible instructions for that particular form.
         :param form: str, The form of the instruction based on its arguments (ex: instruction-register-immediate)
         :return: The appropriate state string for the instruction form
         """
 
         try:
-            state, length = STATE_LIST[form]
-            self.relativeAddressCounter += length
+            state = STATE_LIST[form]
 
         except KeyError as e:
             # Form is invalid, doesn't fit any state descriptions
@@ -159,41 +176,41 @@ class Parser:
         :param labelFlag: int, Used by Assembler to determine if we return a label, global ref, or data/instruction
         :return: Instruction containing relevant data, and the appropriate flag to be used by the assembler
         """
-        if dataIdentifier[-1] == ":" and dataIdentifier[0] != ";":
+        if dataIdentifier[-1] == MEMORY_REFERENCE_INDICATORS and dataIdentifier[0] != COMMENT_INDICATORS:
             # We wouldn't want to accidentally add a memory reference that was part of a comment
 
-            if dataIdentifier.count(':') > 1:
+            if dataIdentifier.count(MEMORY_REFERENCE_INDICATORS) > 1:
                 # Forcing coding standard: labels can't contain colons ":"
                 raise ValueError("Syntax error, memory reference has too many \":\"")
             instruction = dataIdentifier[:-1].upper()
             labelFlag = 1
 
-        elif dataIdentifier == ".GLOBAL":
+        elif dataIdentifier == EXPORTED_REFERENCE_INDICATOR:
             # Global (external) label that can be used by other files
             instruction = line[1].upper()
             labelFlag = 2
 
-        elif dataIdentifier[0] == ";":
+        elif dataIdentifier[0] == COMMENT_INDICATORS:
             # Just a comment, we simply ignore
             instruction = ""
             labelFlag = 3
 
-        elif dataIdentifier == ".DATAALPHA":
+        elif dataIdentifier == DATA_ALPHA_INDICATOR:
             # DataAlpha text, which must be converted into bytestring
             text = text.split(maxsplit=1)
             instruction += text[1][:-1].encode("utf-8")
             self.relativeAddressCounter += len(instruction) + 1
             instruction += b'\x00'
 
-        elif dataIdentifier == ".DATANUMERIC":
+        elif dataIdentifier == DATA_NUMERIC_INDICATOR:
             # DataNumeric number which must be converted to binary
             numeric = self.translateTextImmediate(line[1][1:])
-            instruction += struct.pack(">I", (numeric))
+            instruction += struct.pack(">I", numeric)
             self.relativeAddressCounter += 4
 
-        elif dataIdentifier == ".DATAMEMREF":
+        elif dataIdentifier == DATA_MEMORY_REFERENCE:
             # Memory reference, label will be returned as the instruction
-            if line[1][0] == ":":
+            if line[1][0] == MEMORY_REFERENCE_INDICATORS:
                 memref = line[1][1:].upper()
             else:
                 memref = line[1].upper()
@@ -201,8 +218,8 @@ class Parser:
             self.relativeAddressCounter += 4
 
         else:
-            # Error in code, as the mnemonic MUST be in the accepted list for this method to be called at all
-            raise ValueError("Assembler code error")
+            # Identifier not in accepted list
+            raise ValueError("Invalid instruction format at line " + str(self.lineno) + " \n" + dataIdentifier)
 
         return instruction, labelFlag
 
@@ -364,24 +381,43 @@ class Parser:
 
         return registerCode
 
-    def translateTextImmediate(self, textImmediate: str=""):
+    def translateTextImmediate(self, textImmediate: str = ""):
         """
         This will translate an immediate value in a way that can be understood by the architecture.
         :param textImmediate: str, an immediate value to be translated
         :return: int, an immediate that can be worked on
         """
 
+        immediate = None
+        isNegative = False
         textImmediate = textImmediate.lower()  # Needed in case of 0XFF instead of 0xFF
-        immediate = int(textImmediate, 0)
 
-        if immediate > 0xFFFFFFFF or immediate < -0xFFFFFFFF:
-            # Maximum value is 0xFFFFFFFF
-            raise ValueError("Given immediate value is too big, {} received but "
-                             "maxim value is 0xFFFFFFFF".format(hex(immediate)))
+        if textImmediate[0] == "-":
+            isNegative = True
+            textImmediate = textImmediate[1:]
 
-        immediate &= 0xFFFFFFFF
+        if len(textImmediate) > 2 and textImmediate[0:2] == "0b":
+            # Indicates binary immediate
+            baseToUse = 2
+            textImmediate = textImmediate[2:]
+        elif len(textImmediate) > 2 and textImmediate[0:2] == "0x":
+            # Indicate hexadecimal immediate
+            baseToUse = 16
+            textImmediate = textImmediate[2:]
+        else:
+            # Take a leap of faith! This should be base 10
+            baseToUse = 10
 
-        if immediate < 0:
+        immediate = int(textImmediate, baseToUse)
+
+        validationImmediate = immediate
+        immediate &= 0xFFFFFFFF  # Maximum immediate value is 32 bits
+
+        if validationImmediate != immediate:
+            raise ValueError("Given immediate value is too big, {} received but maxim value is 0xFFFFFFFF".format(
+                hex(validationImmediate)))
+
+        if isNegative:
             # If number was negative, get the 2 complement for this number
             immediate ^= 0xFFFFFFFF  # Flips all the bits, yield the 1 complement
             immediate += 1  # 1 complement + 1 gives the 2 complement

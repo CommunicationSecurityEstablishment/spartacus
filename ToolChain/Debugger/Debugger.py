@@ -21,7 +21,22 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 """
 
 from CapuaEnvironment.Capua import Capua
-from Configuration.Configuration import REGISTERS, \
+from Configuration.Configuration import REGISTER_A, \
+                                        REGISTER_B, \
+                                        REGISTER_C, \
+                                        REGISTER_D, \
+                                        REGISTER_E, \
+                                        REGISTER_F, \
+                                        REGISTER_G, \
+                                        REGISTER_A2, \
+                                        REGISTER_B2, \
+                                        REGISTER_C2, \
+                                        REGISTER_D2, \
+                                        REGISTER_E2, \
+                                        REGISTER_F2, \
+                                        REGISTER_G2, \
+                                        REGISTER_S, \
+                                        REGISTER_S2, \
                                         DEBUGGER_WAKEUP_TICK_COUNT
 
 from ToolChain.Linker.Constants import DEFAULT_LOAD_ADDRESS
@@ -307,37 +322,37 @@ class Debugger:
         """
         result = ""
 
-        if numericRegister == REGISTERS["A"]:
+        if numericRegister == REGISTER_A:
             result = "A"
-        elif numericRegister == REGISTERS["B"]:
+        elif numericRegister == REGISTER_B:
             result = "B"
-        elif numericRegister == REGISTERS["C"]:
+        elif numericRegister == REGISTER_C:
             result = "C"
-        elif numericRegister == REGISTERS["D"]:
+        elif numericRegister == REGISTER_D:
             result = "D"
-        elif numericRegister == REGISTERS["E"]:
+        elif numericRegister == REGISTER_E:
             result = "E"
-        elif numericRegister == REGISTERS["F"]:
+        elif numericRegister == REGISTER_F:
             result = "F"
-        elif numericRegister == REGISTERS["G"]:
+        elif numericRegister == REGISTER_G:
             result = "G"
-        elif numericRegister == REGISTERS["A2"]:
+        elif numericRegister == REGISTER_A2:
             result = "A2"
-        elif numericRegister == REGISTERS["B2"]:
+        elif numericRegister == REGISTER_B2:
             result = "B2"
-        elif numericRegister == REGISTERS["C2"]:
+        elif numericRegister == REGISTER_C2:
             result = "C2"
-        elif numericRegister == REGISTERS["D2"]:
+        elif numericRegister == REGISTER_D2:
             result = "D2"
-        elif numericRegister == REGISTERS["E2"]:
+        elif numericRegister == REGISTER_E2:
             result = "E2"
-        elif numericRegister == REGISTERS["F2"]:
+        elif numericRegister == REGISTER_F2:
             result = "F2"
-        elif numericRegister == REGISTERS["G2"]:
+        elif numericRegister == REGISTER_G2:
             result = "G2"
-        elif numericRegister == REGISTERS["S"]:
+        elif numericRegister == REGISTER_S:
             result = "S"
-        elif numericRegister == REGISTERS["S2"]:
+        elif numericRegister == REGISTER_S2:
             result = "S2"
 
         return result

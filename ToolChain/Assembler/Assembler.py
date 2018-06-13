@@ -76,10 +76,10 @@ class Assembler:
         offset = 0                           # Offset used to calculate a label's offset from the beginning of the file
         lineno = 0                           # Keeps track of which line we're parsing to pinpoint errors
 
-        operand = 0                          # Flag for an operand, meaning parser found a valid instruction
-        localReference = 1                   # Flag for local function, internal symbol
-        globalReference = 2                  # Flag for external function, global symbol
-        comment = 3                          # Flag for comment
+        instructionFlag = 0                  # Flag for an operand, meaning parser found a valid instruction
+        localReferenceFlag = 1               # Flag for local function, internal symbol
+        globalReferenceFlag = 2              # Flag for external function, global symbol
+        commentFlag = 3                      # Flag for comment
 
         file = open(inputFile, mode="r")
         fileLines = file.readlines()
@@ -90,28 +90,28 @@ class Assembler:
         for line in fileLines:
             lineno += 1
             # If the file isn't empty, process the content
-            if line[0] != "\n":
-                # We simply ensure that there is something on the line, not just newline (empty)
-                instruction, offset, labelFlag = parser.parse(line)
 
-                if labelFlag == operand:
-                    masterString += instruction
 
-                elif labelFlag == localReference:
-                    labelTuple = (instruction, offset)
-                    internalList.append(labelTuple)
-                    if instruction in globalList:
-                        externalList.append(labelTuple)
+            instruction, offset, labelFlag = parser.parse(line)
 
-                elif labelFlag == globalReference:
-                    globalList.append(instruction)
+            if labelFlag == instructionFlag:
+                masterString += instruction
 
-                elif labelFlag == comment:
-                    # flag for comment, we simply ignore and move on to the next line
-                    pass
+            elif labelFlag == localReferenceFlag:
+                labelTuple = (instruction, offset)
+                internalList.append(labelTuple)
+                if instruction in globalList:
+                    externalList.append(labelTuple)
 
-                else:
-                    raise ValueError("Couldn't parse instruction at line " + lineno)
+            elif labelFlag == globalReferenceFlag:
+                globalList.append(instruction)
+
+            elif labelFlag == commentFlag:
+                # flag for comment, we simply ignore and move on to the next line
+                pass
+
+            else:
+                raise ValueError("Couldn't parse instruction at line " + lineno)
 
         masterString += b"</Text>"
 

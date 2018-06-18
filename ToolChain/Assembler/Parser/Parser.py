@@ -29,7 +29,6 @@ __status__ = "Dev"
 
 from ToolChain.Assembler.Constants import REGISTERS, \
                                           INSTRUCTION_LIST, \
-                                          LABEL_INSTRUCTIONS, \
                                           STATE_LIST, \
                                           MEMORY_REFERENCE_INDICATORS, \
                                           EXPORTED_REFERENCE_INDICATOR, \
@@ -40,7 +39,8 @@ from ToolChain.Assembler.Constants import REGISTERS, \
                                           IMMEDIATE_PREFIX, \
                                           REGISTER_PREFIX, \
                                           FLAGS_INDICATORS, \
-                                          WIDTH_INDICATORS
+                                          WIDTH_INDICATORS, \
+                                          MAX_OPERAND_COUNT
 
 from CapuaEnvironment.IntructionFetchUnit.FormDescription import formDescription
 from CapuaEnvironment.Instruction.OperationDescription import operationDescription
@@ -59,43 +59,40 @@ class Parser:
     2. Read the file and parse each line into a list to be evaluated one at a time.
     3. Evaluate each line and, if not an empty line, store instructions and memory references in lists.
         - Parse each line and determine whether we're dealing with an instruction, memory reference, data, etc.
-        - If an instruction is found, determine all possible forms for this instruction (eg. ins - reg - reg)
-        - Using possible forms for an instruction, determine the correct instruction code based on given arguments.
+        - If an instruction is found, determine all possible forms for this instruction (eg. InsRegReg)
+        - Using possible forms for an instruction, determine the correct instruction code based on given operands.
     4. Once all info has been evaluated, if correct, we generate the binary code for each instruction
     """
 
-    relativeAddressCounter = 0                # Used to determine memory address of a label at a given point in the file
-    lineno = 0                                # Used to pinpoint where ValueErrors are raised
+    relativeAddress = 0                       # Used to determine memory address of a label at a given point in the file
 
     def parse(self, text):
         """
-        This is the main driver method for the parser. It takes in an individual line of code, parses the info and
-        sends the fully built binary code to the assembler, or returns a memory reference with the appropriate offset.
-        :param text: Str, The line of text as read from the file
-        :return: bytestring, int, int, the binary instruction, the current offset, and the appropriate flag
+        This takes in an individual line of code, parses the info and returns the fully built binary code, or returns a
+        memory reference with the appropriate offset.
+        :param text: Str, Individual line of code.
+        :return: tuple: Represents the binary instruction, the current offset, and the appropriate flag
         """
 
-        self.lineno += 1
-
-        if len(text.split()) == 0:
-            # This ensures we don't evaluate an empty line. This also handles a line full of spaces
-            return "", self.relativeAddressCounter, 3
-
-        line = text.split()                     # We split the line with space as a delimiter. Each token is an argument
-        instruction = b""                       # Instruction will be written as a bytestring
-        operandList = []                        # We keep each argument in a list to evaluate later
-        form = "Ins"                            # We assume the first argument is an instruction
+        self.relativeAddress = 0                # Reset offset (instruction size) for every line parsed
+        line = text.split()                     # We split the line with space as a delimiter. Each token is evaluated
+        instruction = b''                       # Instruction will be written as a bytestring
+        operandList = []                        # We keep each operand in a list to evaluate later
+        form = "Ins"                            # We assume the first token of the line is an instruction
         labelFlag = 0                           # Used by the assembler to determine what we're returning
-        dataIdentifier = line[0].upper()        # used for special identifiers such as .dataAlpha, comments etc.
+
+        # This ensures we don't evaluate an empty line. This also handles a line full of spaces
+        if len(line) == 0:
+            return "", self.relativeAddress, 3
 
         # First off, we need to determine if this line has a label or global label to be referenced
         # If so, we can simply return to the Assembler class with the label, the offset, and the appropriate flag
-        identifierMatch = re.search(r'(\.(\w*))|(\w*:)|(;)', dataIdentifier)
+        identifierMatch = re.search(r'(\.(\w*))|(\w*:)|(;)', line[0].upper())
 
         if identifierMatch:
             # We had a match for identifier patterns, so we assume there's no instruction.
-            instruction, labelFlag = self._evaluateIndicatorData(text, dataIdentifier, line, instruction, labelFlag)
-            return instruction, self.relativeAddressCounter, labelFlag
+            instruction, labelFlag = self._evaluateIndicatorData(text, line[0].upper(), line, instruction)
+            return instruction, self.relativeAddress, labelFlag
 
         elif line[0].upper() in INSTRUCTION_LIST:
             # Next we check if the first item on the line is an instruction
@@ -106,18 +103,18 @@ class Parser:
 
             # We build our instruction's form by verifying each operand after the instruction
             # This will allow us to determine which "state" the instruction belongs to.
-            form, operandList = self._evaluateFormBasedOnArguments(line, form, operandList)
+            form, operandList = self._evaluateFormBasedOnOperands(line, form, operandList)
             instruction += self._findInstructionCode(form, line)
             state = self._definestate(form)
 
             # Finally we evaluate how we will build our binary code. Each state has a distinct pattern we must follow
-            instruction = self._buildBinaryCode(line[0], state, operandList, instruction)
+            instruction += self._buildBinaryCode(line[0], state, operandList)
 
         else:
             # The instruction was not in the list, and no identifier mnemonics were found.
-            raise ValueError("Invalid code format at line " + str(self.lineno))
+            raise ValueError("Invalid assembly instruction format")
 
-        return instruction, self.relativeAddressCounter, labelFlag
+        return instruction, self.relativeAddress, labelFlag
 
     def _findInstructionCode(self, form, line):
         """
@@ -125,7 +122,7 @@ class Parser:
         instruction. Since each instruction + form pair has one distinct instruction length, we also add it here to the
         relativeAddressCounter.
         :param form: str, the assembled form of the particular instruction (ex: InsRegReg)
-        :param line: str list, our line read from input split into individual arguments
+        :param line: str list, our line read from input split into individual tokens
         :return: bytestring, our instruction's correct binary code
         """
 
@@ -137,53 +134,53 @@ class Parser:
             ins = operationDescription[line[0]]
 
         except KeyError as e:
-            raise ValueError("Invalid instruction format at line " + str(self.lineno))
+            raise ValueError("Invalid instruction format")
 
         found = False
 
-        for possiblecodes in ins:
+        for possibleCodes in ins:
             # We shift the binary code by 4 bits to see if we have a match with typeCode for this form
             # ex: typeCode = 0010, possiblecodes = 00101011 would be true since the first 4 bits match.
             # Once we have our instruction match, we know the size of the instruction and we add to the counter
-            if insform["typeCode"] is (possiblecodes >> 4):
+            if insform["typeCode"] is (possibleCodes >> 4):
                 found = True
-                self.relativeAddressCounter += insform["length"]
-                instruction += bytes((possiblecodes,))
+                self.relativeAddress += insform["length"]
+                instruction += bytes((possibleCodes,))
 
         if not found:
             # We shouldn't get to this part since the instruction was in the instruction list. Code error.
-            raise ValueError("Invalid instruction format at line " + str(self.lineno))
+            raise ValueError("Invalid instruction format")
 
         return instruction
 
     def _definestate(self, form):
         """
-        Takes in the form based on instruction and its arguments and determines which form it belongs to.
+        Takes in the form based on instruction and its operands and determines which form it belongs to.
         This state contains all possible instructions for that particular form.
-        :param form: str, The form of the instruction based on its arguments (ex: instruction-register-immediate)
+        :param form: str, The form of the instruction based on its operands (ex: InsRegReg)
         :return: str, The appropriate state string for the instruction form
         """
 
         try:
             state = STATE_LIST[form]
-
         except KeyError as e:
             # Form is invalid, doesn't fit any state descriptions
-            raise ValueError("Invalid instruction format at line " + str(self.lineno))
+            raise ValueError("Invalid instruction format")
 
         return state
 
-    def _evaluateIndicatorData(self, text, dataIdentifier, line, instruction, labelFlag):
+    def _evaluateIndicatorData(self, text, dataIdentifier, line, instruction):
         """
-        This method indicates that we are dealing with identifiers, meaning either dataAlpha, dataNumeric, .global,
-        a label, or a comment.
+        In this method, we are dealing with identifiers, meaning either .dataAlpha, .dataNumeric, .global, a label, or
+        a comment.
         :param text: str, The raw line of text as read from the file directly
-        :param dataIdentifier: str, The first argument of the line, used to determine which identifier we have
-        :param line: str list, The line split into individual arguments using a space delimiter by default
+        :param dataIdentifier: str, The first token of the line, used to determine which identifier we have
+        :param line: str list, The line split into individual tokens using a space delimiter by default
         :param instruction: bytestring, Will contain the piece of data based on the appropriate identifier
-        :param labelFlag: int, Used by Assembler to determine if we return a label, global ref, or data/instruction
         :return: bytestring, Instruction containing relevant data, and the appropriate flag to be used by the assembler
         """
+
+        labelFlag = 0
 
         # This ensures that if we have a memory reference, that it is not part of a comment.
         # Ex: ";label:" should not enter this condition, but "label:" should.
@@ -208,14 +205,14 @@ class Parser:
             # DataAlpha text, which must be converted into bytestring
             text = text.split(maxsplit=1)
             instruction += text[1][:-1].encode("utf-8")
-            self.relativeAddressCounter += len(instruction) + 1
+            self.relativeAddress += len(instruction) + 1
             instruction += b'\x00'
 
         elif dataIdentifier == DATA_NUMERIC_INDICATOR:
             # DataNumeric number which must be converted to binary
             numeric = self.translateTextImmediate(line[1])
             instruction += struct.pack(">I", numeric)
-            self.relativeAddressCounter += 4
+            self.relativeAddress += 4
 
         elif dataIdentifier == DATA_MEMORY_REFERENCE:
             # Memory reference, label will be returned as the instruction
@@ -224,60 +221,61 @@ class Parser:
             else:
                 memref = line[1].upper()
             instruction += b':' + memref.encode("utf-8") + b':'
-            self.relativeAddressCounter += 4
+            self.relativeAddress += 4
 
         else:
             # Identifier not in accepted list
-            raise ValueError("Invalid instruction format at line " + str(self.lineno) + " \n" + dataIdentifier)
+            raise ValueError("Invalid instruction format")
 
         return instruction, labelFlag
 
-    def _evaluateFormBasedOnArguments(self, line, form, operandList):
+    def _evaluateFormBasedOnOperands(self, line, form, operandList):
         """
-        Method looks at the whole line after the initial instruction and determines its form based on the arguments.
-        Registers are concatenated as "REG", immediates and lables as "IMM", etc. We also populate a list of arguments
+        Method looks at the whole line after the initial instruction and determines its form based on the operands.
+        Registers are concatenated as "REG", immediates and lables as "IMM", etc. We also populate a list of operands
         as they are to be constructed into binary code later.
-        :param line: str list, Line split into individual arguments
-        :param form: str, will be built up based on arguments on the line in this method
-        :param operandList: str list, contains our list of arguments to be used later when assembling our binary code
-        :return: str, Fully constructed form and newly populated list of arguments
+        :param line: str list, Line split into individual operands
+        :param form: str, will be built up based on operands on the line in this method
+        :param operandList: str list, contains our list of operands to be used later when assembling our binary code
+        :return: str, Fully constructed form and newly populated list of operands
         """
 
         opcount = 0
 
-        for arg in line[1:]:
-            if arg[0] == REGISTER_PREFIX:
+        for element in line[1:]:
+            if element[0] == REGISTER_PREFIX:
                 form += "Reg"
-            elif arg[0] == IMMEDIATE_PREFIX:
+            elif element[0] == IMMEDIATE_PREFIX:
                 form += "Imm"
-            elif arg[0] + arg[-1] == FLAGS_INDICATORS:
+            elif element[0] + element[-1] == FLAGS_INDICATORS:
                 form += "Flag"
-            elif arg[0] + arg[-1] == WIDTH_INDICATORS:
+            elif element[0] + element[-1] == WIDTH_INDICATORS:
                 form += "Width"
-            elif arg[0] == COMMENT_INDICATORS:
+            elif element[0] == COMMENT_INDICATORS:
                 # We found a comment, we break out of the loop
                 break
             else:
                 form += "Imm"
-            operandList.append(arg)                  # We store the arguments to use later when building our binary code
+            operandList.append(element)               # We store the operands to use later when building our binary code
             opcount += 1
 
-        if opcount > 3:
-            raise ValueError("Invalid instruction format: Too many arguments at line " + str(self.lineno))
+        if opcount > MAX_OPERAND_COUNT:
+            raise ValueError("Invalid instruction format: Too many operands")
 
         return form, operandList
 
-    def _buildBinaryCode(self, ins, state, operandList, instruction):
+    def _buildBinaryCode(self, ins, state, operandList):
         """
         This is the last step in parsing a line of code: assembling the actual binary code. Each state has a particular
         structure that is needed to be read correctly by the Capua VM. This method takes care of every form and gets
         the binary values for each register and immediate value. Labels are converted to bytestring as they are.
         :param ins: str, the actual instruction itself
-        :param state: str, State of the instruction based on evaluated form (ex: instruction-register = STATE1)
-        :param operandList: str list, List of arguments to be converted to binary code and assembled
-        :param instruction: bytestring, our final binary code to be returned to the assembler
-        :return: bytestring, The newly built binary code for the instruction and arguments
+        :param state: str, State of the instruction based on evaluated form (ex: InsReg = STATE1)
+        :param operandList: str list, List of operands to be converted to binary code and assembled
+        :return: bytestring, The newly built binary code for the instruction and operands
         """
+
+        instruction = b''
 
         if state == "STATE0":
             # Instruction is already complete, there is only one operand (the instruction itself, Ins)
@@ -300,7 +298,7 @@ class Parser:
             if operandList[0][0] == "#":
                 immediate = self.translateTextImmediate(operandList[0][1:])
                 instruction += immediate.to_bytes(4, byteorder='big')
-            elif ins in LABEL_INSTRUCTIONS:
+            else:
                 instruction += b':' + operandList[0].encode("utf-8") + b':'
 
         elif state == "STATE4":
@@ -309,7 +307,7 @@ class Parser:
             if operandList[0][0] == "#":
                 immediate = self.translateTextImmediate(operandList[0][1:])
                 instruction += immediate.to_bytes(4, byteorder='big') + bytes(0b0000) + bytes((register,))
-            elif ins in LABEL_INSTRUCTIONS:
+            else:
                 instruction += b':' + operandList[0].encode("utf-8") + b':' + bytes(0b0000) + bytes((register,))
 
         elif state == "STATE5":
@@ -369,7 +367,7 @@ class Parser:
             if operandList[1][0] == "#":
                 immediate = self.translateTextImmediate(operandList[1][1:])
                 instruction += bytes((flag,)) + bytes(0b0000) + immediate.to_bytes(4, byteorder='big')
-            elif ins in LABEL_INSTRUCTIONS:
+            else:
                 instruction += bytes((flag,)) + bytes(0b0000) + b':' + operandList[1].encode("utf-8") + b':'
 
         elif state == "STATE10":
@@ -380,8 +378,8 @@ class Parser:
             instruction += bytes((flag,))
 
         else:
-            # Nothing was valid in the first argument
-            raise ValueError("Invalid instruction format at line " + str(self.lineno))
+            # Instruction is invalid
+            raise ValueError("Invalid instruction format")
 
         return instruction
 
@@ -399,9 +397,8 @@ class Parser:
 
         try:
             registerCode = REGISTERS[registerName.upper()]
-
         except KeyError as e:
-            raise ValueError("Invalid instruction format: invalid register name at line " + str(self.lineno))
+            raise ValueError("Invalid instruction format: invalid register")
 
         return registerCode
 
@@ -452,8 +449,8 @@ class Parser:
     def translateTextFlags(self, textFlags):
         """
         Will translate a text FLAGs to flags code as:
-        FLAGS: 0b000 : Zero, Lower, Higher
-        :param textFlags: str, the flags themselves as a string
+        FLAGS: 0b000 : Equal, Lower, Higher
+        :param textFlags: str, the flags from the source file
         :return:
         """
         codeFlags = 0b000

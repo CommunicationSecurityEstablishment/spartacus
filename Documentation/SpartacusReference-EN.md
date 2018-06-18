@@ -466,9 +466,12 @@ directives. These directives are to be used when writing code.
     the name in code. For example:
     **MOV stackAddress $A**
     Would result in the linked address of
-    :stackAddress being put as an immediate
-    value in the mov instruction displayed. That
-    could also be used in loops:
+    stackAddress being put as an immediate
+    value in the mov instruction displayed. Colons
+    are not permitted to be a part of the label name
+    itself. Thus the only colon should be the last
+    character on the line. Symbols 
+    may also be used in loops:
     **JMP <> loopStart**
 * ".global symbolName"
     * Will allow the assembler to add a symbol to

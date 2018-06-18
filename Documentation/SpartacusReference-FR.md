@@ -478,7 +478,11 @@ sur les directives de l'assembleur. Ces directives doivent
     Par exemple, dans le cas **MOV stackAddress $A**.
     L’adresse liée de stackAddress serait mise
     comme valeur immédiate dans l’instruction
-    mov affichée. On pourrait aussi l’utiliser dans
+    mov affichée. Présentement, un symbole
+    ne peut avoir de caractère ":" dans son nom.
+    Donc, le seul ":" doit apparaitre à la fin du
+    symbole pour terminer sa déclaration. 
+    On pourrait aussi l’utiliser dans
     les boucles comme **JMP <> loopStart**
 * ".global NomDeSymbole"
     * Permet à l’assembleur d’ajouter un symbole

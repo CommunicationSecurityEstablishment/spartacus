@@ -1,0 +1,426 @@
+; This is the lone ball game.
+.global start
+
+start:
+    MOV vector $A
+    SIVR $A
+    MOV #0x40004000 $S  ; Set a stack
+
+    ; display_Line($A=line, $C=text, $D=len)
+    MOV #10 $A
+    MOV welcome $C
+    mov #25 $D
+    CALL display_Line
+
+    MOV #11 $A
+    MOV instruction $C
+    mov #40 $D
+    CALL display_Line
+    MOV #12 $A
+    MOV enterYourName $C
+    mov #45 $D
+    CALL display_Line
+    MOV #0 $G                   ; This will be used in the keyboard handler as x position during stage 0
+    MOV #0x20000300 $A          ; Setting clock speed
+    MEMW [4] #0x37 $A
+    call ball_setup
+    ACTI                        ; Since the game is interrupt driven, this essentially starts the game!
+
+wait_for_step1:
+    MOV gameStep $A
+    MEMR [4] $A $B
+    CMP #1 $B
+    JMP <LH> wait_for_step1    ; This will simply wait until we're done with step 0
+
+    call display_Clear          ; Step 0 of game is done, we can clear the screen and prepare for game
+    mov paddleY $A
+    MEMR [4] $A $A
+    call show_new_paddle
+
+wait_for_step2:
+    call show_score
+    MOV gameStep $A
+    MEMR [4] $A $B
+    CMP #2 $B
+    JMP <LH> wait_for_step2    ; This will simply wait until we're done with step 0
+
+wait_for_step3:
+    MOV gameStep $A
+    MEMR [4] $A $B
+    CMP #3 $B
+    JMP <LH> wait_for_step2    ; This will simply wait until we're done with step 0
+
+; show_score()
+show_score:
+    MOV playerScore $A
+    MEMR [4] $A $A
+    MOV playerAlphaSore $C
+    ; helper_integerToAlpha($A=intvalue, $C=destBuffer)
+    CALL helper_integerToAlpha
+
+    MOV playerAlphaSore $A
+    CALL helper_stringLength
+
+    ; display_Line($A=line, $C=text, $D=len)
+    MOV $A $D
+    MOV #24 $A
+    MOV playerAlphaSore $C
+    CALL display_Line
+    RET
+
+; show_new_paddle($A= new position)
+show_new_paddle:
+    ; 88 is 'X'
+    push $a
+    mov #0 $A
+    call display_Clear_Col
+    pop $c
+    push $c
+    xor $a $a
+    mov #88 $d
+    call display_Char
+    pop $c
+    add #1 $c
+    push $c
+    xor $a $a
+    mov #88 $d
+    call display_Char
+    pop $c
+    add #1 $c
+    push $c
+    xor $a $a
+    mov #88 $d
+    call display_Char
+    pop $c
+    add #1 $c
+    xor $a $a
+    mov #88 $d
+    call display_Char
+    ret
+
+
+; ball_setup()
+ball_setup:
+    CALL helper_saveRegs
+    MOV #0x20000100 $C      ; This is the clock (as in time not interrupt) address
+    MEMR [4] $C $A
+    MOV #10 $D
+    DIV $A $D
+    MOV tickPerX $E
+    ADD #1 $B               ; Prevent 0
+    MEMW [4] $B $E
+    DIV $A $D
+    MOV tickPerY $E
+    ADD #1 $B               ; Prevent 0
+    MEMW [4] $B $E
+    CALL helper_restoreRegs
+    RET
+
+
+
+; display_new_ball($A=newx, $C=newy)
+display_new_ball:
+    RET
+
+tickPerX:
+.dataNumeric 0x0
+tickPerY:
+.dataNumeric 0x0
+
+ballXPosition:
+.dataNumeric 0x00000028
+ballYPosition:
+.dataNumeric 0x0000000b
+
+ballXDirection:
+.dataNumeric 0xFFFFFFFF
+ballYDirection:
+.dataNumeric 0xFFFFFFFF
+
+tick:
+.dataNumeric 0x1
+
+
+computeNewBallPosition:
+
+    ; IF X position is 1 and on paddle change X direction to 1
+    MOV ballXPosition $A
+    MEMR [4] $A $A
+    CMP #1 $A
+    JMP <LH> cnbp_notOnX1Position
+h0:
+    MOV ballYPosition $A
+    MEMR [4] $A $A
+    MOV paddleY $B
+    MEMR [4] $B $B
+    CMP $A $B
+    JMP <L> cnbp_notOnX1Position
+    ADD #4 $B                       ; The paddle is 4 char long
+    CMP $A $B
+    JMP <H> cnbp_notOnX1Position
+    ; If we're here, the direction needs to be changed
+h1:
+    MOV ballXDirection $B
+    MEMR [4] $B $A
+    CMP #0xFFFFFFFF $A
+    JMP <LH> cnbp_xGoingNegative
+    MEMW [4] #0x1 $B
+    JMP <> cnbp_notOnX79Position
+cnbp_xGoingNegative:
+    MEMW [4] #0xFFFFFFFF $B
+    JMP <> cnbp_notOnX79Position
+
+cnbp_notOnX1Position:
+    ; else if x position is 79 change X direction to -1
+    MOV ballXPosition $A
+    MEMR [4] $A $A
+    CMP #79 $A
+    JMP <LH> cnbp_notOnX79Position
+    MOV ballXDirection $B
+    MEMW [4] #0xFFFFFFFF $B
+
+cnbp_notOnX79Position:
+    ; IF Y position is 0 change Y direction to 1
+    MOV ballYPosition $A
+    MEMR [4] $A $A
+    CMP #0 $A
+    JMP <LH> cnbp_notOnY0Position
+    cd1:
+    MOV ballYDirection $B
+    MEMW [4] #0x01 $B
+    JMP <> cnbp_processNewX
+
+cnbp_notOnY0Position:
+    ; else if y position is 24 change Y direction to -1
+    MOV ballYPosition $A
+    MEMR [4] $A $A
+    CMP #24 $A
+    JMP <LH> cnbp_processNewX
+    MOV ballYDirection $B
+    MEMW [4] #0xFFFFFFFF $B
+
+cnbp_processNewX:
+    ; If on X tick, increment X position by X direction
+    MOV tick $D
+    MOV tickPerX $C
+    MEMR [4] $D $D
+    MEMR [4] $C $C
+    DIV $D $C
+    CMP #0 $B
+    JMP <LH> cnbp_processNewY
+    MOV ballXPosition $C
+    MOV ballXDirection $A
+    MEMR [4] $C $D
+    MEMR [4] $A $B
+    ADD $B $D
+    MEMW [4] $D $C
+
+cnbp_processNewY:
+    ; IF on Y tick, increment Y position by Y direction
+    MOV tick $D
+    MOV tickPerY $C
+    MEMR [4] $D $D
+    MEMR [4] $C $C
+    DIV $D $C
+    CMP #0 $B
+    JMP <LH> cnbp_done
+    MOV ballYPosition $C
+    MOV ballYDirection $A
+    MEMR [4] $C $D
+    MEMR [4] $A $B
+    ADD $B $D
+    MEMW [4] $D $C
+
+cnbp_done:
+    RET
+
+clockHandler:
+    PUSH $A
+    PUSH $B
+    PUSH $C
+    CALL helper_saveRegs
+
+    MOV gameStep $A     ; Coming block of code check for stage 2
+    MEMR [4] $A $B
+    CMP #1 $B
+    JMP <LH> ch_done    ; If we're not in stage 2, the handler is of no use: nothing to do
+
+    ; This is where the ball logic happens
+
+    ; if ball x is 0 the game is over
+    MOV ballXPosition $B        ; Increment the game step
+    MEMR [4] $B $A
+    CMP #0 $A
+    JMP <L> ch_checkPosition
+ch_incrementStep:
+    MOV gameStep $B        ; Increment the game step - The game is over!
+    MEMR [4] $B $A
+    ADD #1 $A
+    MEMW [4] $A $B
+    JMP <> ch_done
+
+ch_checkPosition:
+    ; The ball is about to move
+    MOV ballXPosition $A
+    MEMR [4] $A $A
+    MOV ballYPosition $C
+    MEMR [4] $C $C
+    MOV #0x20 $D
+    ; display_Char($A=xpos, $C=ypos, $D=char)
+    CALL display_Char                              ; This erases the ball from previous display
+
+    CALL computeNewBallPosition                    ; Updating the ball position
+
+    ; display_Char($A=xpos, $C=ypos, $D=char)
+    MOV ballXPosition $A
+    MEMR [4] $A $A
+    MOV ballYPosition $C
+    MEMR [4] $C $C
+    MOV #79 $D                                      ; Code for char "O"
+
+    CALL display_Char                              ; This displays the new ball
+
+    ; Score is also updated here
+ch_increment_score:
+    MOV tick $B
+    MEMR [4] $B $A
+    MOV #20 $B
+    DIV $A $B
+    CMP #0 $B
+    JMP <lh> ch_done       ; Increment on 20th tick
+    MOV playerScore $B
+    MEMR [4] $B $A
+    ADD #1 $A
+    MEMW [4] $A $B
+
+    ; Every 10 points, increment clock speed
+    MOV #10 $B
+    DIV $A $B
+    CMP #0 $B
+    JMP <LH> ch_done
+    MOV #0x20000300 $A          ; Setting clock speed
+    MEMR [4] $A $B
+    CMP #6 $B
+    JMP <EH> ch_done
+    SUB #5 $B
+    MEMW [4] $B $A
+
+    JMP <> ch_done
+
+ch_done:
+    MOV tick $B
+    MEMR [4] $B $A
+    ADD #1 $A
+    MEMW [4] $A $B       ; Increment the clock tick count
+    CALL helper_restoreRegs
+    POP $C
+    POP $B
+    POP $A
+    HIRET
+
+keyboardHandler:
+    PUSH $A
+    PUSH $B
+    PUSH $C
+    PUSH $D
+    MEMR [1] #0x20001800 $A     ; reading scan code
+    MEMR [4] gameStep $B
+    CMP #0 $B
+    JMP <e> kh_s0
+    CMP #2 $B
+    JMP <e> kh_done
+
+    ; Here we try define if paddle goes up or down
+    ; Working directly with scan code to prevent useless translation
+temp_break:
+    CMP #38 $A
+    JMP <e> kh_paddle_up
+    CMP #56 $A
+    JMP <lh> kh_done
+kh_paddle_down:
+    MEMR [4] paddleY $A
+    CMP #21 $A
+    JMP <le> kh_done
+    ADD #1 $A
+    MEMW [4] $A paddleY
+    CALL show_new_paddle
+    JMP <>  kh_done
+kh_paddle_up:
+    MEMR [4] paddleY $A
+    CMP #0 $A
+    JMP <e> kh_done
+    SUB #1 $A
+    MEMW [4] $A paddleY
+    CALL show_new_paddle
+    JMP <>  kh_done
+kh_s0:
+    CMP #0x24 $A                    ; This is scan code for "enter key"
+    JMP <e> kh_name_input_done
+    CALL key_getCharFromCode
+    MOV playerName $B
+    ADD $G $B
+    MEMW [1] $A $B
+    ; display_Char($A=xpos, $C=ypos, $D=char)
+    MOV $A $D
+    MOV $G $A
+    MOV #13 $C
+    CALL display_Char
+    ADD #1 $G
+    JMP <> kh_done
+kh_name_input_done:
+    MOV playerName $B
+    ADD $G $B
+    MEMW [1] #0x0 $B        ; Terminates player name string with 0
+    MOV gameStep $B        ; Increment the game step
+    MEMR [4] $B $A
+    ADD #1 $A
+    MEMW [4] $A $B
+
+kh_done:
+    POP $D
+    POP $C
+    POP $B
+    POP $A
+    HIRET
+
+hardDriveReadHandler:
+HIRET
+
+hardDriveWriteHandler:
+HIRET
+
+
+vector:
+.dataMemRef clockHandler
+.dataMemRef keyboardHandler
+.dataMemRef hardDriveReadHandler
+.dataMemRef hardDriveWriteHandler
+
+playerScore:
+.dataNumeric 0x00000000
+playerName:
+.dataAlpha AAAAAAAAAAAAAAAAAAAA
+playerAlphaSore:
+.dataAlpha AAAAAAAAAAAAAAAAAAAA
+welcome:
+.dataAlpha Welcome to LoneBall Game!
+instruction:
+.dataAlpha Use a(up) and b(down) to move the paddle
+enterYourName:
+.dataAlpha Please type your name (press enter when done)
+gameOver:
+.dataAlpha Game over! Please press enter to start again!
+
+highScore:
+.dataNumeric 0x00000000
+highPlayerName:
+.dataAlpha AAAAAAAAAAAAAAAAAAAA
+highPlayerAlphaSore:
+.dataAlpha AAAAAAAAAAAAAAAAAAAA
+
+paddleY:
+.dataNumeric 0x0000000a
+
+gameStep:
+.dataNumeric 0x0    ;0 = enter your name, 1 = in game, 2 = end game
+end:

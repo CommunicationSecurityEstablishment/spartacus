@@ -28,19 +28,27 @@ __maintainer__ = "CSE"
 __status__ = "Dev"
 
 from ToolChain.Assembler.Parser.Parser import Parser
+from ToolChain.Assembler.Constants import INSTRUCTION_FLAG, \
+                                          LOCAL_REFERENCE_FLAG, \
+                                          GLOBAL_REFERENCE_FLAG, \
+                                          COMMENT_FLAG
 
 import struct
 
 
 class Assembler:
+    """
+    This is the Assembler class which takes in an input file and output file name specified by the user. The input file
+    must be a .casm file, which will then be parsed and converted to write the .o file to the specified output name.
+    This .o file contains the list of local and global labels, the offset of these labels relative to the beginning of
+    the file, and the binary code. Each line in the file is read, and converted to binary instructions by the parser.
+    """
 
     def __init__(self, inputFile=None, outputFile=None):
         """
-        This allows for simple initialisation of the assembler. This class reads the input file line by line and sends
-        to the parser for evaluation. Based on the information retrieved, the assembler will sort the information
-        accordingly to write to the .o file.
-        :param inputFile: str, input textfile name to be read and parsed
-        :param outputFile: str, output texfile name to write to output
+        Initializes Assembler with input and output files.
+        :param inputFile: str, input .casm file to be read
+        :param outputFile: str, specified name of the .o file the assembler will create
         """
 
         if type(inputFile) is not str or len(inputFile) is 0:
@@ -50,90 +58,109 @@ class Assembler:
             # File is invalid
             raise ValueError("Assembler error - Invalid output file selected")
 
-        self._parseAssembledFile(inputFile, outputFile)
+        self._AssembleFile(inputFile, outputFile)
 
-    def _parseAssembledFile(self, inputFile, outputFile):
+    def _AssembleFile(self, inputFile, outputFile):
         """
-        This method assembles the binary data itself. It will parse each line individually and extract the info needed:
-        1.If the label flag is set to 0, it's a regular instruction, string, number, of memref.
-        2.If the label flag is set to 1, it's an internal symbol.
-        3.If the label flag is set to 2, it's an external symbol.
-        In cases 2 and 3, the symbols are added to their respective lists along with their memory location.
-        Memory locations are relative to the beginning of the file. Instructions and data are given set lengths.
-        Internal and external symbol lists contain tuples containing the symbol name, and its offset.
-        These will be used to fill the .o file information before the binary data.
-        :param inputFile: str, the name of the file to be read.
-        :param outputFile: str, the name of the file to be written to.
+        This method assembles an object file (.o) from a provided Capua assembly file (.casm)
+        :param inputFile: str, the name of the .casm file to be read and parsed.
+        :param outputFile: str, the name of the file .o to be created.
         :return:
         """
 
         parser = Parser()                    # Parser object which will return the binary code for instructions
-        masterString = b""                   # String that will eventually be our output file
-        xmlstring = b""                      # String that will contain the "xml" data at the beginning of the .o file
-        globalList = []                      # Temporary list to hold the names of global(external) symbols
-        externalList = []                    # Master list of all external symbols to be used by linker
-        internalList = []                    # Master list of all internal symbols
-        offset = 0                           # Offset used to calculate a label's offset from the beginning of the file
+        binaryDataString = b"<Text>"         # String that will contain our binary code
+        xmlString = b""                      # String that will contain the "xml" data at the beginning of the .o file
+        globalSymbols = []                   # Temporary list to hold the names of global(external) symbols
+        localSymbols = []                    # Temporary list to hold the names of local(internal) symbols
+        externalSymbols = []                 # Master list of all external symbols to be used by linker
+        internalSymbols = []                 # Master list of all internal symbols
+        offset = 0                           # Holds the instruction's length, used to calculate offset
         lineno = 0                           # Keeps track of which line we're parsing to pinpoint errors
+        relativeAddressCounter = 0           # Used to determine memory address of a label at a given point in the file
 
-        instructionFlag = 0                  # Flag for an operand, meaning parser found a valid instruction
-        localReferenceFlag = 1               # Flag for local function, internal symbol
-        globalReferenceFlag = 2              # Flag for external function, global symbol
-        commentFlag = 3                      # Flag for comment
-
-        file = open(inputFile, mode="r")
-        fileLines = file.readlines()
-        file.close()
-
-        masterString += b"<Text>"
+        try:
+            # Initial test to verify that the file we're reading actually exists
+            file = open(inputFile, mode="r")
+            fileLines = file.readlines()
+            file.close()
+        except KeyError as e:
+            raise ValueError("Error - unable to open file: " + inputFile)
 
         for line in fileLines:
             lineno += 1
-            # If the file isn't empty, process the content
+            # Here we begin our evaluation of each line. We get the binary instruction, offset, and label flag
+            # Memory locations are relative to the beginning of the file. Instructions and data are given set lengths.
+            # Internal and external symbol lists contain tuples containing the symbol name, and its offset.
+            # These will be used to fill the .o file information before the binary data.
 
+            try:
+                # This will catch any exception thrown by the parser. If there is one, we print the error,
+                # The line at which it occurred, and we quit out.
+                instruction, offset, labelFlag = parser.parse(line)
+                relativeAddressCounter += offset
+            except ValueError as e:
+                print(str(e) + " at line: {}".format(lineno))
+                quit()
 
-            instruction, offset, labelFlag = parser.parse(line)
+            if labelFlag == INSTRUCTION_FLAG:
+                # If the label flag is set to 0, it's a regular instruction, string, number, of memref.
+                binaryDataString += instruction
 
-            if labelFlag == instructionFlag:
-                masterString += instruction
+            elif labelFlag == LOCAL_REFERENCE_FLAG:
+                # If the label flag is set to 1, it's an internal symbol. We ensure labels are unique when declared
+                if instruction not in localSymbols:
+                    localSymbols.append(instruction)
+                    labelTuple = (instruction, relativeAddressCounter)
+                    internalSymbols.append(labelTuple)
+                else:
+                    raise ValueError("Label already present in local list, cannot declare duplicate label name")
+                if instruction in globalSymbols:
+                    externalSymbols.append(labelTuple)
 
-            elif labelFlag == localReferenceFlag:
-                labelTuple = (instruction, offset)
-                internalList.append(labelTuple)
-                if instruction in globalList:
-                    externalList.append(labelTuple)
+            elif labelFlag == GLOBAL_REFERENCE_FLAG:
+                # If the label flag is set to 2, it's an external symbol. We ensure labels are unique when declared
+                if instruction not in globalSymbols:
+                    if instruction not in localSymbols:
+                        globalSymbols.append(instruction)
+                    else:
+                        # We can't have a global label declared if it has already been set as a local one
+                        raise ValueError("Label already present in local list, cannot be declared as global")
+                else:
+                    raise ValueError("Label already present in global list, cannot declare duplicate label name")
 
-            elif labelFlag == globalReferenceFlag:
-                globalList.append(instruction)
-
-            elif labelFlag == commentFlag:
+            elif labelFlag == COMMENT_FLAG:
                 # flag for comment, we simply ignore and move on to the next line
                 pass
 
             else:
                 raise ValueError("Couldn't parse instruction at line " + lineno)
 
-        masterString += b"</Text>"
+        binaryDataString += b"</Text>"
 
         # builds the output file by extracting and printing each symbol into its appropriate category.
-        xmlstring = b"<AssemblySize>" + struct.pack(">I", parser.relativeAddressCounter) + \
+        xmlString = b"<AssemblySize>" + struct.pack(">I", relativeAddressCounter) + \
                     b"</AssemblySize><InternalSymbols>"
 
-        for word in internalList:
-            xmlstring += b"<refName>" + word[0].encode("utf-8") + b"</refName>"
-            xmlstring += b"<refAdd>" + struct.pack(">I", word[1]) + b"</refAdd>"
+        for word in internalSymbols:
+            xmlString += b"<refName>" + word[0].encode("utf-8") + b"</refName>"
+            xmlString += b"<refAdd>" + struct.pack(">I", word[1]) + b"</refAdd>"
 
-        xmlstring += b"</InternalSymbols><ExternalSymbols>"
+        xmlString += b"</InternalSymbols><ExternalSymbols>"
 
-        for word in externalList:
-            xmlstring += b"<refName>" + word[0].encode("utf-8") + b"</refName>"
-            xmlstring += b"<refAdd>" + struct.pack(">I", word[1]) + b"</refAdd>"
+        for word in externalSymbols:
+            xmlString += b"<refName>" + word[0].encode("utf-8") + b"</refName>"
+            xmlString += b"<refAdd>" + struct.pack(">I", word[1]) + b"</refAdd>"
 
-        xmlstring += b"</ExternalSymbols>"
+        xmlString += b"</ExternalSymbols>"
 
-        # Now we can put the xml string together with the masterString to output to file
-        xmlstring += masterString
-        file = open(outputFile, mode="wb")
-        file.write(xmlstring)
-        file.close()
+        # Now we can put the xml string together with the binaryDataString to output to file
+        xmlString += binaryDataString
 
+        try:
+            # Test to see if we are able to write to the output file defined by user
+            file = open(outputFile, mode="wb")
+            file.write(xmlString)
+            file.close()
+        except KeyError as e:
+            raise ValueError("Error - unable to open file: " + inputFile)

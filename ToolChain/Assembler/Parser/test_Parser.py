@@ -1353,26 +1353,27 @@ class TestParser(unittest.TestCase):
         """
 
         try:
-            assembler = Assembler("testAssembledFile.casm", "testout.test")
+            assembler = Assembler("ToolChain/Assembler/Parser/testAssembledFile.casm",
+                                  "ToolChain/Assembler/Parser/testout.test")
         except KeyError as e:
             self.assertEqual(1, 0)
 
         try:
-            file = open("testout.test", mode="rb")
+            file = open("ToolChain/Assembler/Parser/testout.test", mode="rb")
             newFile = file.read()
             file.close()
         except KeyError as e:
             self.assertEqual(1, 0)
 
         try:
-            file = open("LoneBall.test", mode="rb")
+            file = open("ToolChain/Assembler/Parser/LoneBall.test", mode="rb")
             testFile = file.read()
             file.close()
         except KeyError as e:
             self.assertEqual(1, 0)
 
         self.assertEqual(newFile, testFile)
-        os.remove("testout.test")
+        os.remove("ToolChain/Assembler/Parser/testout.test")
 
 
 

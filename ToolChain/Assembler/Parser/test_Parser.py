@@ -138,6 +138,17 @@ class TestParser(unittest.TestCase):
 
         self.assertRaises(ValueError, self.parser.parse, ":START: ")
 
+    def test_parseErrorInvalidLabelInInstruction(self):
+        """
+        Tests the method:
+        parse(self, text)
+        for an invalid label within in instruction
+        """
+
+        self.assertRaises(ValueError, self.parser.parse, "MOV :START $A ")
+        self.assertRaises(ValueError, self.parser.parse, "MOV :START: $A ")
+        self.assertRaises(ValueError, self.parser.parse, "MOV START: $A ")
+
     def test_findInstructionCodeIns(self):
         """
         Tests the method:

@@ -10,7 +10,7 @@ start:
     MOV #10 $A
     MOV welcome $C
     mov #25 $D
-    CALL :display_Line
+    CALL display_Line
 
     MOV #11 $A
     MOV instruction $C
@@ -30,7 +30,7 @@ wait_for_step1:
     MOV gameStep $A
     MEMR [4] $A $B
     CMP #1 $B
-    JMP <LH> :wait_for_step1    ; This will simply wait until we're done with step 0
+    JMP <LH> wait_for_step1    ; This will simply wait until we're done with step 0
 
     call display_Clear          ; Step 0 of game is done, we can clear the screen and prepare for game
     mov paddleY $A
@@ -343,7 +343,7 @@ kh_paddle_down:
     JMP <le> kh_done
     ADD #1 $A
     MEMW [4] $A paddleY
-    CALL :show_new_paddle
+    CALL show_new_paddle
     JMP <>  kh_done
 kh_paddle_up:
     MEMR [4] paddleY $A

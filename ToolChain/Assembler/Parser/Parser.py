@@ -299,7 +299,10 @@ class Parser:
                 immediate = self.translateTextImmediate(operandList[0][1:])
                 instruction += immediate.to_bytes(4, byteorder='big')
             else:
-                instruction += b':' + operandList[0].encode("utf-8") + b':'
+                if operandList[0].count(MEMORY_REFERENCE_INDICATORS) == 0:
+                    instruction += b':' + operandList[0].encode("utf-8") + b':'
+                else:
+                    raise ValueError("Syntax error, memory reference may not contain any colons in its name - \":\"")
 
         elif state == "STATE4":
             # Form = Instruction - Immediate - Register
@@ -308,7 +311,10 @@ class Parser:
                 immediate = self.translateTextImmediate(operandList[0][1:])
                 instruction += immediate.to_bytes(4, byteorder='big') + bytes(0b0000) + bytes((register,))
             else:
-                instruction += b':' + operandList[0].encode("utf-8") + b':' + bytes(0b0000) + bytes((register,))
+                if operandList[0].count(MEMORY_REFERENCE_INDICATORS) == 0:
+                    instruction += b':' + operandList[0].encode("utf-8") + b':' + bytes(0b0000) + bytes((register,))
+                else:
+                    raise ValueError("Syntax error, memory reference may not contain any colons in its name - \":\"")
 
         elif state == "STATE5":
             # Form = Instruction - Width - Immediate - Immediate
@@ -317,12 +323,18 @@ class Parser:
                 immediate = self.translateTextImmediate(operandList[1][1:])
                 immediate = immediate.to_bytes(4, byteorder='big')
             else:
-                immediate = b":" + operandList[1].encode("utf-8") + b':'
+                if operandList[1].count(MEMORY_REFERENCE_INDICATORS) == 0:
+                    immediate = b":" + operandList[1].encode("utf-8") + b':'
+                else:
+                    raise ValueError("Syntax error, memory reference may not contain any colons in its name - \":\"")
             if operandList[2][0] == IMMEDIATE_PREFIX:
                 immediate2 = self.translateTextImmediate(operandList[2][1:])
                 immediate2 = immediate2.to_bytes(4, byteorder='big')
             else:
-                immediate2 = b":" + operandList[2].encode("utf-8") + b':'
+                if operandList[2].count(MEMORY_REFERENCE_INDICATORS) == 0:
+                    immediate2 = b":" + operandList[2].encode("utf-8") + b':'
+                else:
+                    raise ValueError("Syntax error, memory reference may not contain any colons in its name - \":\"")
             width = self.translateTextImmediate(width)
             instruction += bytes(0b0000) + bytes((width,)) + immediate + immediate2
 
@@ -333,7 +345,10 @@ class Parser:
                 immediate = self.translateTextImmediate(operandList[1][1:])
                 immediate = immediate.to_bytes(4, byteorder='big')
             else:
-                immediate = b":" + operandList[1].encode("utf-8") + b':'
+                if operandList[1].count(MEMORY_REFERENCE_INDICATORS) == 0:
+                    immediate = b":" + operandList[1].encode("utf-8") + b':'
+                else:
+                    raise ValueError("Syntax error, memory reference may not contain any colons in its name - \":\"")
             register = self.translateRegisterName(operandList[2][1:])
             width = self.translateTextImmediate(width)
             width = (width << 4) + register
@@ -347,7 +362,10 @@ class Parser:
                 immediate = self.translateTextImmediate(operandList[2][1:])
                 immediate = immediate.to_bytes(4, byteorder='big')
             else:
-                immediate = b":" + operandList[2].encode("utf-8") + b':'
+                if operandList[2].count(MEMORY_REFERENCE_INDICATORS) == 0:
+                    immediate = b":" + operandList[2].encode("utf-8") + b':'
+                else:
+                    raise ValueError("Syntax error, memory reference may not contain any colons in its name - \":\"")
             width = self.translateTextImmediate(width)
             width = (width << 4) + register
             instruction += bytes((width,)) + immediate
@@ -368,7 +386,10 @@ class Parser:
                 immediate = self.translateTextImmediate(operandList[1][1:])
                 instruction += bytes((flag,)) + bytes(0b0000) + immediate.to_bytes(4, byteorder='big')
             else:
-                instruction += bytes((flag,)) + bytes(0b0000) + b':' + operandList[1].encode("utf-8") + b':'
+                if operandList[1].count(MEMORY_REFERENCE_INDICATORS) == 0:
+                    instruction += bytes((flag,)) + bytes(0b0000) + b':' + operandList[1].encode("utf-8") + b':'
+                else:
+                    raise ValueError("Syntax error, memory reference may not contain any colons in its name - \":\"")
 
         elif state == "STATE10":
             # Form = Instruction - Flag - Register

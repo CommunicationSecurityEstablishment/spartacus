@@ -1294,6 +1294,28 @@ class TestParser(unittest.TestCase):
 
         self.assertRaises(ValueError, self.parser._buildBinaryCode, text.split()[0], "STATE11", arglist)
 
+    def test_verifyLabel(self):
+        """
+        Tests the method
+        verifyLabel(self, label):
+        """
+
+        self.assertEqual(b':test:', self.parser.verifyLabel("test"))
+        self.assertEqual(b':Label:', self.parser.verifyLabel("Label"))
+        self.assertRaises(ValueError, self.parser.verifyLabel, ":error")
+
+    def test_verifyLabelError(self):
+        """
+        Tests the method
+        verifyLabel(self, label):
+        for invalid label names
+        """
+
+        self.assertRaises(ValueError, self.parser.verifyLabel, ":error")
+        self.assertRaises(ValueError, self.parser.verifyLabel, "error:")
+        self.assertRaises(ValueError, self.parser.verifyLabel, ":error:")
+        self.assertRaises(ValueError, self.parser.verifyLabel, "err:or")
+
     def test_translateTextFlags(self):
         """
         Test the method:
@@ -1356,21 +1378,25 @@ class TestParser(unittest.TestCase):
             assembler = Assembler("ToolChain/Assembler/Parser/testAssembledFile.casm",
                                   "ToolChain/Assembler/Parser/testout.test")
         except KeyError as e:
-            self.assertEqual(1, 0)
+            self.fail("Unexpected error: {}".format(e))
 
         try:
             file = open("ToolChain/Assembler/Parser/testout.test", mode="rb")
             newFile = file.read()
             file.close()
-        except KeyError as e:
-            self.assertEqual(1, 0)
+        except OSError as e:
+            self.fail("Unexpected error: {}".format(e))
+        except IOError as e:
+            self.fail("Unexpected error: {}".format(e))
 
         try:
             file = open("ToolChain/Assembler/Parser/LoneBall.test", mode="rb")
             testFile = file.read()
             file.close()
-        except KeyError as e:
-            self.assertEqual(1, 0)
+        except OSError as e:
+            self.fail("Unexpected error: {}".format(e))
+        except IOError as e:
+            self.fail("Unexpected error: {}".format(e))
 
         self.assertEqual(newFile, testFile)
         os.remove("ToolChain/Assembler/Parser/testout.test")

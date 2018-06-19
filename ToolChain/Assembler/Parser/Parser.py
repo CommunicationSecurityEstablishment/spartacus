@@ -299,10 +299,7 @@ class Parser:
                 immediate = self.translateTextImmediate(operandList[0][1:])
                 instruction += immediate.to_bytes(4, byteorder='big')
             else:
-                if operandList[0].count(MEMORY_REFERENCE_INDICATORS) == 0:
-                    instruction += b':' + operandList[0].encode("utf-8") + b':'
-                else:
-                    raise ValueError("Syntax error, memory reference may not contain any colons in its name - \":\"")
+                instruction += self.verifyLabel(operandList[0])
 
         elif state == "STATE4":
             # Form = Instruction - Immediate - Register
@@ -311,10 +308,7 @@ class Parser:
                 immediate = self.translateTextImmediate(operandList[0][1:])
                 instruction += immediate.to_bytes(4, byteorder='big') + bytes(0b0000) + bytes((register,))
             else:
-                if operandList[0].count(MEMORY_REFERENCE_INDICATORS) == 0:
-                    instruction += b':' + operandList[0].encode("utf-8") + b':' + bytes(0b0000) + bytes((register,))
-                else:
-                    raise ValueError("Syntax error, memory reference may not contain any colons in its name - \":\"")
+                instruction += self.verifyLabel(operandList[0]) + bytes(0b0000) + bytes((register,))
 
         elif state == "STATE5":
             # Form = Instruction - Width - Immediate - Immediate
@@ -323,18 +317,14 @@ class Parser:
                 immediate = self.translateTextImmediate(operandList[1][1:])
                 immediate = immediate.to_bytes(4, byteorder='big')
             else:
-                if operandList[1].count(MEMORY_REFERENCE_INDICATORS) == 0:
-                    immediate = b":" + operandList[1].encode("utf-8") + b':'
-                else:
-                    raise ValueError("Syntax error, memory reference may not contain any colons in its name - \":\"")
+                immediate = self.verifyLabel(operandList[1])
+
             if operandList[2][0] == IMMEDIATE_PREFIX:
                 immediate2 = self.translateTextImmediate(operandList[2][1:])
                 immediate2 = immediate2.to_bytes(4, byteorder='big')
             else:
-                if operandList[2].count(MEMORY_REFERENCE_INDICATORS) == 0:
-                    immediate2 = b":" + operandList[2].encode("utf-8") + b':'
-                else:
-                    raise ValueError("Syntax error, memory reference may not contain any colons in its name - \":\"")
+                immediate2 = self.verifyLabel(operandList[2])
+
             width = self.translateTextImmediate(width)
             instruction += bytes(0b0000) + bytes((width,)) + immediate + immediate2
 
@@ -345,10 +335,8 @@ class Parser:
                 immediate = self.translateTextImmediate(operandList[1][1:])
                 immediate = immediate.to_bytes(4, byteorder='big')
             else:
-                if operandList[1].count(MEMORY_REFERENCE_INDICATORS) == 0:
-                    immediate = b":" + operandList[1].encode("utf-8") + b':'
-                else:
-                    raise ValueError("Syntax error, memory reference may not contain any colons in its name - \":\"")
+                immediate = self.verifyLabel(operandList[1])
+
             register = self.translateRegisterName(operandList[2][1:])
             width = self.translateTextImmediate(width)
             width = (width << 4) + register
@@ -362,10 +350,8 @@ class Parser:
                 immediate = self.translateTextImmediate(operandList[2][1:])
                 immediate = immediate.to_bytes(4, byteorder='big')
             else:
-                if operandList[2].count(MEMORY_REFERENCE_INDICATORS) == 0:
-                    immediate = b":" + operandList[2].encode("utf-8") + b':'
-                else:
-                    raise ValueError("Syntax error, memory reference may not contain any colons in its name - \":\"")
+                immediate = self.verifyLabel(operandList[2])
+
             width = self.translateTextImmediate(width)
             width = (width << 4) + register
             instruction += bytes((width,)) + immediate
@@ -386,10 +372,7 @@ class Parser:
                 immediate = self.translateTextImmediate(operandList[1][1:])
                 instruction += bytes((flag,)) + bytes(0b0000) + immediate.to_bytes(4, byteorder='big')
             else:
-                if operandList[1].count(MEMORY_REFERENCE_INDICATORS) == 0:
-                    instruction += bytes((flag,)) + bytes(0b0000) + b':' + operandList[1].encode("utf-8") + b':'
-                else:
-                    raise ValueError("Syntax error, memory reference may not contain any colons in its name - \":\"")
+                instruction += bytes((flag,)) + bytes(0b0000) + self.verifyLabel(operandList[1])
 
         elif state == "STATE10":
             # Form = Instruction - Flag - Register
@@ -403,6 +386,24 @@ class Parser:
             raise ValueError("Invalid instruction format")
 
         return instruction
+
+    def verifyLabel(self, label):
+        """
+        Function takes a given label and validates it. Labels can't contain colons when used in an instruction.
+        For example, MOV label $A is valid, but MOV :label $A is not. We then return the label converted to its
+        appropriate form for the .o file, with colons on each end as a bytestring.
+        :param label: str, label to be evaluated
+        :return: bytestring, encoded label to be returned as immediate operand
+        """
+
+        immediate = b''
+
+        if label.count(MEMORY_REFERENCE_INDICATORS) == 0:
+            immediate += b':' + label.encode("utf-8") + b':'
+        else:
+            raise ValueError("Syntax error, memory reference may not contain any colons in its name - \":\"")
+
+        return immediate
 
     def translateRegisterName(self, registerName: str=""):
         """

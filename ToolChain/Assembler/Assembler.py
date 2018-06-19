@@ -84,8 +84,10 @@ class Assembler:
             file = open(inputFile, mode="r")
             fileLines = file.readlines()
             file.close()
-        except KeyError as e:
-            raise ValueError("Error - unable to open file: " + inputFile)
+        except OSError as e:
+            raise OSError("Error - unable to open file: {}".format(inputFile))
+        except IOError as e:
+            raise IOError("Error - unable to open file: {}".format(inputFile))
 
         for line in fileLines:
             lineno += 1
@@ -114,7 +116,7 @@ class Assembler:
                     labelTuple = (instruction, relativeAddressCounter)
                     internalSymbols.append(labelTuple)
                 else:
-                    raise ValueError("Label already present in local list, cannot declare duplicate label name")
+                    raise ValueError("Local label already declared; cannot declare duplicate label name")
                 if instruction in globalSymbols:
                     externalSymbols.append(labelTuple)
 
@@ -125,9 +127,9 @@ class Assembler:
                         globalSymbols.append(instruction)
                     else:
                         # We can't have a global label declared if it has already been set as a local one
-                        raise ValueError("Label already present in local list, cannot be declared as global")
+                        raise ValueError("Global label must be declared before its local declaration.")
                 else:
-                    raise ValueError("Label already present in global list, cannot declare duplicate label name")
+                    raise ValueError("Global label already declared; cannot declare duplicate label name")
 
             elif labelFlag == COMMENT_FLAG:
                 # flag for comment, we simply ignore and move on to the next line
@@ -162,5 +164,8 @@ class Assembler:
             file = open(outputFile, mode="wb")
             file.write(xmlString)
             file.close()
-        except KeyError as e:
-            raise ValueError("Error - unable to open file: " + inputFile)
+        except OSError as e:
+            raise OSError("Error - unable to open file: {}".format(outputFile))
+        except IOError as e:
+            raise IOError("Error - unable to open file: {}".format(outputFile))
+

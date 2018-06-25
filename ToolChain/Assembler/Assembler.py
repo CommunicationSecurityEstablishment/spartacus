@@ -31,7 +31,7 @@ from ToolChain.Assembler.Parser.Parser import Parser
 from ToolChain.Assembler.Constants import INSTRUCTION_FLAG, \
                                           LOCAL_REFERENCE_FLAG, \
                                           GLOBAL_REFERENCE_FLAG, \
-                                          COMMENT_FLAG
+                                          EMPTY_LINE_FLAG
 
 import struct
 
@@ -70,12 +70,10 @@ class Assembler:
 
         parser = Parser()                    # Parser object which will return the binary code for instructions
         binaryDataString = b"<Text>"         # String that will contain our binary code
-        xmlString = b""                      # String that will contain the "xml" data at the beginning of the .o file
         globalSymbols = []                   # Temporary list to hold the names of global(external) symbols
         localSymbols = []                    # Temporary list to hold the names of local(internal) symbols
         externalSymbols = []                 # Master list of all external symbols to be used by linker
         internalSymbols = []                 # Master list of all internal symbols
-        offset = 0                           # Holds the instruction's length, used to calculate offset
         lineno = 0                           # Keeps track of which line we're parsing to pinpoint errors
         relativeAddressCounter = 0           # Used to determine memory address of a label at a given point in the file
 
@@ -131,7 +129,7 @@ class Assembler:
                 else:
                     raise ValueError("Global label already declared; cannot declare duplicate label name")
 
-            elif labelFlag == COMMENT_FLAG:
+            elif labelFlag == EMPTY_LINE_FLAG:
                 # flag for comment, we simply ignore and move on to the next line
                 pass
 
@@ -140,7 +138,7 @@ class Assembler:
 
         binaryDataString += b"</Text>"
 
-        # builds the output file by extracting and printing each symbol into its appropriate category.
+        # Writes the label info by extracting and printing each symbol into its appropriate category.
         xmlString = b"<AssemblySize>" + struct.pack(">I", relativeAddressCounter) + \
                     b"</AssemblySize><InternalSymbols>"
 

@@ -43,7 +43,7 @@ MAX_OPERAND_COUNT = 3
 INSTRUCTION_FLAG = 0
 LOCAL_REFERENCE_FLAG = 1
 GLOBAL_REFERENCE_FLAG = 2
-COMMENT_FLAG = 3
+EMPTY_LINE_FLAG = 3
 
 NUMERIC_DATA_INDICATOR = "int"
 ALPHA_DATA_INDICATOR = "alpha"
@@ -70,16 +70,14 @@ IDENTIFIER_LIST = [
     ":", ".GLOBAL", ".DATAALPHA", ".DATANUMERIC", ".DATAMEMREF", ";"
 ]
 
-STATE_LIST = {
-    "Ins": "STATE0",
-    "InsReg": "STATE1",
-    "InsRegReg": "STATE2",
-    "InsImm": "STATE3",
-    "InsImmReg": "STATE4",
-    "InsWidthImmImm": "STATE5",
-    "InsWidthImmReg": "STATE6",
-    "InsWidthRegImm": "STATE7",
-    "InsWidthRegReg": "STATE8",
-    "InsFlagImm": "STATE9",
-    "InsFlagReg": "STATE10",
-}
+STATE0 = "Ins"
+STATE1 = "InsReg"
+STATE2 = "InsRegReg"
+STATE3 = "InsImm"
+STATE4 = "InsImmReg"
+STATE5 = "InsWidthImmImm"
+STATE6 = "InsWidthImmReg"
+STATE7 = "InsWidthRegImm"
+STATE8 = "InsWidthRegReg"
+STATE9 = "InsFlagImm"
+STATE10 = "InsFlagReg"

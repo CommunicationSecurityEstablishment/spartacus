@@ -29,7 +29,6 @@ __status__ = "Dev"
 
 from ToolChain.Assembler.Constants import REGISTERS, \
                                           INSTRUCTION_LIST, \
-                                          STATE_LIST, \
                                           MEMORY_REFERENCE_INDICATORS, \
                                           EXPORTED_REFERENCE_INDICATOR, \
                                           DATA_NUMERIC_INDICATOR, \
@@ -44,7 +43,18 @@ from ToolChain.Assembler.Constants import REGISTERS, \
                                           INSTRUCTION_FLAG, \
                                           LOCAL_REFERENCE_FLAG, \
                                           GLOBAL_REFERENCE_FLAG, \
-                                          COMMENT_FLAG
+                                          EMPTY_LINE_FLAG, \
+                                          STATE0, \
+                                          STATE1, \
+                                          STATE2, \
+                                          STATE3, \
+                                          STATE4, \
+                                          STATE5, \
+                                          STATE6, \
+                                          STATE7, \
+                                          STATE8, \
+                                          STATE9, \
+                                          STATE10
 
 from CapuaEnvironment.IntructionFetchUnit.FormDescription import formDescription
 from CapuaEnvironment.Instruction.OperationDescription import operationDescription
@@ -78,37 +88,37 @@ class Parser:
         :return: tuple: Represents the binary instruction, the current offset, and the appropriate flag
         """
 
-        line = text.split(';', maxsplit=1)[0]     # This removes the comments from the line; we don't need to evaluate
-        line = line.split()                       # We split the line with space as a delimiter. Each token is evaluated
-        self.relativeAddress = 0                  # Reset offset (instruction size) for every line parsed
-        instruction = b''                         # Instruction will be written as a bytestring
-        form = "Ins"                              # We assume the first token of the line is an instruction
-        labelFlag = INSTRUCTION_FLAG              # Determines what type of data we're returning
+        self.relativeAddress = 0                              # Reset offset (instruction size) for every line parsed
+        line = text.split(COMMENT_INDICATORS, maxsplit=1)[0]  # This removes the comments from the line
+        line = line.split()                                   # Our line split into individual tokens
 
         # This ensures we don't evaluate an empty line. This also handles a line full of spaces
         if len(line) == 0:
-            return "", self.relativeAddress, COMMENT_FLAG
+            return "", self.relativeAddress, EMPTY_LINE_FLAG
 
         # First off, we need to determine if this line has a label, alpha value, numeric value, or mem ref to evaluate
         # If so, we can simply return the label, the offset, and the appropriate flag
-        if re.search(r'(\.(\w*))|(\w*:)', line[0]):
+
+        mnemonic = line[0].upper()                # First token of the line, either a label identifier or instruction
+        operands = line[1:]                       # The remainder of the line, our list of operands
+        labelFlag = INSTRUCTION_FLAG              # Determines what type of data we're returning
+
+        if re.search(r'(\.(\w*))|(\w*:)', mnemonic):
             # We had a match for identifier patterns, so we assume there's no instruction.
-            instruction, labelFlag = self._evaluateIndicatorData(text, line[0].upper(), line, instruction)
+            instruction, labelFlag = self._evaluateIndicatorData(text, mnemonic)
             return instruction, self.relativeAddress, labelFlag
 
-        elif line[0].upper() in INSTRUCTION_LIST:
+        elif mnemonic in INSTRUCTION_LIST:
             # Next we check if the first item on the line is an instruction
             # If we make it to this line, there were no data indicators (.dataAlpha, comments, labels etc.)
-            line = [element.upper() for element in line]
-
             # We build our instruction's form by verifying each operand after the instruction
             # This will allow us to determine which "state" the instruction belongs to.
-            form, operandList = self._evaluateFormBasedOnOperands(line, form)
-            instruction += self._findInstructionCode(form, line)
-            state = self._definestate(form)
+            operands = [op.upper() for op in operands]
+            form = self._evaluateFormBasedOnOperands(operands)
+            instruction = self._findInstructionCode(form, mnemonic)
 
             # Finally we evaluate how we will build our binary code. Each state has a distinct pattern we must follow
-            instruction += self._buildBinaryCode(state, operandList)
+            instruction += self._buildBinaryCode(form, operands)
 
         else:
             # The instruction was not in the list, and no identifier mnemonics were found.
@@ -116,13 +126,13 @@ class Parser:
 
         return instruction, self.relativeAddress, labelFlag
 
-    def _findInstructionCode(self, form, line):
+    def _findInstructionCode(self, form, mnemonic):
         """
         Finds the instruction's binary code based on the instruction's form, which relies on the operands after the
         instruction. Since each instruction + form pair has one distinct instruction length, we also add it here to the
         relativeAddressCounter.
         :param form: str, the assembled form of the particular instruction (ex: InsRegReg)
-        :param line: str list, our line read from input split into individual tokens
+        :param mnemonic: str list, our line read from input split into individual tokens
         :return: bytestring, our instruction's correct binary code
         """
 
@@ -131,7 +141,7 @@ class Parser:
         try:
             # We make sure the form is described in the formDescription Class
             insform = formDescription[form]
-            ins = operationDescription[line[0]]
+            ins = operationDescription[mnemonic]
 
         except KeyError as e:
             raise ValueError("Invalid instruction format")
@@ -143,76 +153,52 @@ class Parser:
             if insform["typeCode"] is (possibleCodes >> 4):
                 self.relativeAddress += insform["length"]
                 instruction += bytes((possibleCodes,))
-                break
+                return instruction
         else:
             # We shouldn't get to this part since the instruction was in the instruction list. Code error.
             raise ValueError("Invalid instruction format")
 
-        return instruction
-
-    def _definestate(self, form):
-        """
-        Takes in the form based on instruction and its operands and determines which form it belongs to.
-        This state contains all possible instructions for that particular form.
-        :param form: str, The form of the instruction based on its operands (ex: InsRegReg)
-        :return: str, The appropriate state string for the instruction form
-        """
-
-        try:
-            state = STATE_LIST[form]
-        except KeyError as e:
-            # Form is invalid, doesn't fit any state descriptions
-            raise ValueError("Invalid instruction format")
-
-        return state
-
-    def _evaluateIndicatorData(self, text, dataIdentifier, line, instruction):
+    def _evaluateIndicatorData(self, text, mnemonic):
         """
         In this method, we are dealing with identifiers, meaning either .dataAlpha, .dataNumeric, .global, a label, or
         a comment.
         :param text: str, The raw line of text as read from the file directly
-        :param dataIdentifier: str, The first token of the line, used to determine which identifier we have
-        :param line: str list, The line split into individual tokens using a space delimiter by default
-        :param instruction: bytestring, Will contain the piece of data based on the appropriate identifier
         :return: bytestring, Instruction containing relevant data, and the appropriate flag to be used by the assembler
         """
 
+        operands = text.split()
         labelFlag = INSTRUCTION_FLAG
+        instruction = b''
 
-        # This ensures that if we have a memory reference, that it is not part of a comment.
-        # Ex: ";label:" should not enter this condition, but "label:" should.
-        if dataIdentifier[-1] == MEMORY_REFERENCE_INDICATORS and dataIdentifier[0] != COMMENT_INDICATORS:
-            if dataIdentifier.count(MEMORY_REFERENCE_INDICATORS) > 1:
+        if mnemonic[-1] == MEMORY_REFERENCE_INDICATORS:
+            # Local (internal) label that can only be used within the file
+            if mnemonic.count(MEMORY_REFERENCE_INDICATORS) > 1:
                 # Forcing coding standard: labels can't contain colons ":"
                 raise ValueError("Syntax error, memory reference has too many \":\"")
-            instruction = dataIdentifier[:-1].upper()
+            instruction = mnemonic[:-1].upper()
             labelFlag = LOCAL_REFERENCE_FLAG
 
-        elif dataIdentifier == EXPORTED_REFERENCE_INDICATOR:
+        elif mnemonic == EXPORTED_REFERENCE_INDICATOR:
             # Global (external) label that can be used by other files
-            instruction = line[1].upper()
+            instruction = operands[1].upper()
             labelFlag = GLOBAL_REFERENCE_FLAG
 
-        elif dataIdentifier == DATA_ALPHA_INDICATOR:
+        elif mnemonic == DATA_ALPHA_INDICATOR:
             # DataAlpha text, which must be converted into bytestring
-            text = text.split(maxsplit=1)
-            instruction += text[1][:-1].encode("utf-8")
+            operands = text.split(maxsplit=1)
+            instruction += operands[1][:-1].encode("utf-8")
             self.relativeAddress += len(instruction) + 1
             instruction += b'\x00'
 
-        elif dataIdentifier == DATA_NUMERIC_INDICATOR:
+        elif mnemonic == DATA_NUMERIC_INDICATOR:
             # DataNumeric number which must be converted to binary
-            numeric = self.translateTextImmediate(line[1])
+            numeric = self.translateTextImmediate(operands[1])
             instruction += struct.pack(">I", numeric)
             self.relativeAddress += 4
 
-        elif dataIdentifier == DATA_MEMORY_REFERENCE:
+        elif mnemonic == DATA_MEMORY_REFERENCE:
             # Memory reference, label will be returned as the instruction
-            if line[1][0] == MEMORY_REFERENCE_INDICATORS:
-                memref = line[1][1:].upper()
-            else:
-                memref = line[1].upper()
-            instruction += b':' + memref.encode("utf-8") + b':'
+            instruction += b':' + operands[1].encode("utf-8").upper() + b':'
             self.relativeAddress += 4
 
         else:
@@ -221,20 +207,20 @@ class Parser:
 
         return instruction, labelFlag
 
-    def _evaluateFormBasedOnOperands(self, line, form):
+    def _evaluateFormBasedOnOperands(self, operands):
         """
         Method looks at the whole line after the initial instruction and determines its form based on the operands.
-        Registers are concatenated as "REG", immediates and lables as "IMM", etc. We also populate a list of operands
-        as they are to be constructed into binary code later.
-        :param line: str list, Line split into individual operands
-        :param form: str, will be built up based on operands on the line in this method
-        :return: str, Fully constructed form and newly populated list of operands
+        Registers are concatenated as "REG", immediates and lables as "IMM", etc.
+        :param operands: str list, Line split into individual operands
+        :return: str, Fully constructed form
         """
 
-        if len(line[1:]) > MAX_OPERAND_COUNT:
+        form = "Ins"
+
+        if len(operands) > MAX_OPERAND_COUNT:
             raise ValueError("Invalid instruction format: Too many operands")
 
-        for element in line[1:]:
+        for element in operands:
             if element[0] == REGISTER_PREFIX:
                 form += "Reg"
             elif element[0] == IMMEDIATE_PREFIX:
@@ -246,9 +232,9 @@ class Parser:
             else:
                 form += "Imm"
 
-        return form, line[1:]
+        return form
 
-    def _buildBinaryCode(self, state, operandList):
+    def _buildBinaryCode(self, form, operandList):
         """
         This is the last step in parsing a line of code: assembling the actual binary code. Each state has a particular
         structure that is needed to be read correctly by the Capua VM. This method takes care of every form and gets
@@ -260,23 +246,23 @@ class Parser:
 
         instruction = b''
 
-        if state == "STATE0":
+        if form == STATE0:
             # Instruction is already complete, there is only one operand (the instruction itself, Ins)
             pass
 
-        elif state == "STATE1":
+        elif form == STATE1:
             # Form = Instruction - Register
             register = self.translateRegisterName(operandList[0][1:])
             instruction += bytes(0b0000) + bytes((register,))
 
-        elif state == "STATE2":
+        elif form == STATE2:
             # Form = Instruction - Register - Register
             register = self.translateRegisterName(operandList[0][1:])
             register2 = self.translateRegisterName(operandList[1][1:])
             register = (register << 4) + register2
             instruction += bytes((register,))
 
-        elif state == "STATE3":
+        elif form == STATE3:
             # Form = Instruction - Immediate
             if operandList[0][0] == "#":
                 immediate = self.translateTextImmediate(operandList[0][1:])
@@ -284,7 +270,7 @@ class Parser:
             else:
                 instruction += self.verifyLabel(operandList[0])
 
-        elif state == "STATE4":
+        elif form == STATE4:
             # Form = Instruction - Immediate - Register
             register = self.translateRegisterName(operandList[1][1:])
             if operandList[0][0] == "#":
@@ -293,7 +279,7 @@ class Parser:
             else:
                 instruction += self.verifyLabel(operandList[0]) + bytes(0b0000) + bytes((register,))
 
-        elif state == "STATE5":
+        elif form == STATE5:
             # Form = Instruction - Width - Immediate - Immediate
             width = operandList[0][1:-1]
             if operandList[1][0] == IMMEDIATE_PREFIX:
@@ -311,7 +297,7 @@ class Parser:
             width = self.translateTextImmediate(width)
             instruction += bytes(0b0000) + bytes((width,)) + immediate + immediate2
 
-        elif state == "STATE6":
+        elif form == STATE6:
             # Form = Instruction - Width - Immediate - Register
             width = operandList[0][1:-1]
             if operandList[1][0] == IMMEDIATE_PREFIX:
@@ -325,7 +311,7 @@ class Parser:
             width = (width << 4) + register
             instruction += bytes((width,)) + immediate
 
-        elif state == "STATE7":
+        elif form == STATE7:
             # Form = Instruction - Width - Register - Immediate
             width = operandList[0][1:-1]
             register = self.translateRegisterName(operandList[1][1:])
@@ -339,7 +325,7 @@ class Parser:
             width = (width << 4) + register
             instruction += bytes((width,)) + immediate
 
-        elif state == "STATE8":
+        elif form == STATE8:
             # Form = Instruction - Width - Register - Register
             width = operandList[0][1:-1]
             register = self.translateRegisterName(operandList[1][1:])
@@ -348,7 +334,7 @@ class Parser:
             width = (width << 4) + register
             instruction += bytes((width,)) + bytes((register2,))
 
-        elif state == "STATE9":
+        elif form == STATE9:
             # Form = Instruction - Flag - Immediate
             flag = self.translateTextFlags(operandList[0][1:-1])
             if operandList[1][0] == "#":
@@ -357,7 +343,7 @@ class Parser:
             else:
                 instruction += bytes((flag,)) + bytes(0b0000) + self.verifyLabel(operandList[1])
 
-        elif state == "STATE10":
+        elif form == STATE10:
             # Form = Instruction - Flag - Register
             flag = self.translateTextFlags(operandList[0][1:-1])
             register = self.translateRegisterName(operandList[1][1:])
@@ -401,9 +387,9 @@ class Parser:
         """
 
         try:
-            registerCode = REGISTERS[registerName.upper()]
+            registerCode = REGISTERS[registerName]
         except KeyError as e:
-            raise ValueError("Invalid instruction format: invalid register")
+            raise ValueError("Invalid instruction format: invalid register {}".format(registerName))
 
         return registerCode
 

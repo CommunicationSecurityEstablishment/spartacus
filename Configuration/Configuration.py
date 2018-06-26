@@ -41,7 +41,6 @@ REGISTER_D = 0b0011
 REGISTER_E = 0b0100
 REGISTER_F = 0b0101
 REGISTER_G = 0b0110
-
 REGISTER_S = 0b0111
 
 REGISTER_A2 = 0b1000
@@ -51,7 +50,6 @@ REGISTER_D2 = 0b1011
 REGISTER_E2 = 0b1100
 REGISTER_F2 = 0b1101
 REGISTER_G2 = 0b1110
-
 REGISTER_S2 = 0b1111
 
 DISPLAY_REFRESH_RATE = 5      # This is in milliseconds
@@ -74,4 +72,5 @@ DEBUGGER_WAKEUP_TICK_COUNT = 0    # Used to keep debugger "in control"
 VIRTUAL_BOOT_ENABLED = True       # This will enforce booting from the "hard drive" by using the "firmware"
 FIRMWARE_LOAD_ADDRESS = 0x40001000      # Firmware will be loaded at this address when using virtual boot
 FIRMWARE_BINARY_FILE_PATH = "CapuaEnvironment/firmware.bin"
+
 

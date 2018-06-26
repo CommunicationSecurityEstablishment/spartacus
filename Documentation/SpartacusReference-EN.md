@@ -411,8 +411,7 @@ software development. Therefore, they do
 present some bugs and, as a developer, you have to
 be careful to use these tools exactly as this text
 explains their use. Know that these bugs are being
-addressed. We are planning on a re-write
-of these.
+addressed. We are planning to re-write some of these.
 
 ## Compiler
 We do not currently have a compiler. This is one of the major area where
@@ -421,22 +420,11 @@ open source contribution would be more than welcome!
 ## Assembler.py
 ##### Overview
 Capua has its own assembler. It’s easy to use. The implementation is fairly
-straightforward. Please remember
-that the current version of the assembler has been
-written as a testing tool for Capua. Be extra careful to
+straightforward. Be extra careful to
 fully respect the syntax described here since error
 messages might not always be easy to understand.
-Also, in it’s current state, the assembler is very
-“typo” sensitive. Every part of an instruction needs
-to be separated by a white space. This includes the end
-of line comment:
->**MOV $A $B;This is not good enough**
-
->**MOV $A $B ;This is fine**
-
-Obviously many of these problems are easy
-fixes. Feel free to jump in and contribute some
-code.
+Every part of an instruction needs
+to be separated by a white space. 
 
 When running the assembler, the input file is
 transformed into a .o file. Please note that, the
@@ -470,7 +458,7 @@ directives. These directives are to be used when writing code.
     value in the mov instruction displayed. Colons
     are not permitted to be a part of the label name
     itself. Thus the only colon should be the last
-    character on the line. Symbols 
+    character on the line when labels are declared initially. Symbols 
     may also be used in loops:
     **JMP <> loopStart**
 * ".global symbolName"
@@ -481,26 +469,24 @@ directives. These directives are to be used when writing code.
     * The “;” character, like in many other
     assembly languages, indicates a comment.
     These can either be on a line of their own or
-    at the end of a line, after an instruction.
-    Please note that, in case a comment is put
-    after an instruction, a space must separate
-    the end of the instruction from the
-    beginning of the comment (the “;”
-    character)
+    at the end of a line, after an instruction. Note that
+    anything following a semi-colon ";" character will be ignored
+    by the assembler. 
+    
 * ".dataAlpha"
     * This can be used anywhere as long as it sits
     on a line of it’s own. This directive is
     followed by a white space and by free
     formed text. The text does not need to be
-    quoted. In fact, it MUST NOT be quoted.
+    quoted. If you do, the quotes will simply be included in your text.
     The string ends at the end of the line. The
     assembler will add a 0x00 termination
     character at the end of the string at
     assembling time. Usage example
     testString:
     **.dataAlpha This is a test string**
-    *Please note that no comment can follow this
-    line.*
+    *Please note that comments can't be added after a .dataAlpha 
+    declaration. If you do, comments will simply be included in the string.*
 * ".dataMemRef"
     * This is similar to .dataNumeric except that it
     allows the programmer to specify a memory reference.

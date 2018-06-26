@@ -426,7 +426,7 @@ présentent des "bugs" et, en tant que développeur,
 vous devez vous assurer de les utiliser exactement 
 de la manière décrite. Plusieurs de ces problèmes
 ont été corrigés depuis la version 1.0. Une réécriture
-de ces outils est planifiée.
+de certains outils est planifiée.
 
 ## Compilateur
 Nous n'avons présentemant aucun compilateur. C'est un des éléments majeurs
@@ -437,20 +437,9 @@ bienvenue.
 ##### Survol
 Capua possède son propre assembleur. Il est facile à utiliser et son implémentation est assez
 simple.
-N'oubliez pas que la version actuelle de l'assembleur a été
-écrite comme outil de test pour Capua.
 Veuillez respecter la syntaxe décrite ici puisque
 les messages d'erreur ne sont pas toujours faciles à comprendre.
-L'assembleur est très sensible aux erreurs typographique. 
-Par exemple, chaque partie d'une instruction doit
-être séparée par un espace blanc. Cela inclut les commentaires en fin de ligne:
-
->**MOV $A $B;This is not good enough**
-
->**MOV $A $B ;This is fine**
-
-De toute évidence, un bon nombre de ces problèmes sont faciles
-à corriger. N'hésitez pas à vous impliquer et à contribuer.
+Toute partie d'un instruction doit être séparée par des espaces. 
 
 Lors de l'assemblage, le fichier d'entrée est
 transformé en un fichier .o. Veuillez noter que
@@ -491,25 +480,24 @@ sur les directives de l'assembleur. Ces directives doivent
     * Le caractère ";", comme dans beaucoup
     d’autres langages assembleur, indique un
     commentaire. Les commentaires peuvent être soit sur
-    leur propre ligne, soit à la fin d’une ligne, à la
-    suite d’une instruction. Veuillez noter que,
-    dans le cas où un commentaire est mis après
-    une instruction, un espace doit séparer la fin
-    de l’instruction du début du commentaire (le
-    caractère ";").
+    leur propre ligne, soit à la fin d’une ligne, ou à la
+    suite d’une instruction. Veuillez noter que tout texte suivi
+    du caractère ";" sera ignoré par l'assembleur.
+    
 * ".dataAlpha"
     * On peut l’utiliser n’importe où tant qu’elle se
     trouve sur sa propre ligne. Cette directive est
     suivie par un espace blanc et un texte au
     format libre. Le texte n’a pas besoin d’être
-    mis entre guillemets. En fait, il ne doit pas
-    être mis entre guillemets. La chaîne de caractères se
+    mis entre guillemets. Si on ajoute des guillmets,
+    ils seront tout simplement ajoutés au texte. La chaîne de caractères se
     termine à la fin de la ligne. L’assembleur
     ajoute un caractère de fin (0x00) à la fin de la
     chaîne au moment de l’assemblage. Exemple
     d’utilisation:      
     **.dataAlpha This is a test string**
-    *Notez qu'aucun commentaire ne peut suivre cette ligne.*
+    *Notez qu'un commentaire peut suivre cette ligne, mais ce dernier sera ajouté au texte
+    comme du texte régulier.*
 * ".dataMemRef"
     * Ceci est semblable à .dataNumeric, sauf 
     qu'un programmeur peut spécifier une référence en mémoire.

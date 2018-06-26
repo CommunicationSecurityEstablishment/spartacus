@@ -40,7 +40,6 @@ still require a lot of work:
 * C (or other language) compiler (no compiler at current time)
 * Debugger improvement (step into, step over, ...)
 * ".o" file format improvement (current format is prone to bugs)
-* Assembler rewrite
 
 
 Please note that any contribution has to follow GPLv2 licence. Also, any contribution
@@ -61,7 +60,7 @@ Any code contribution not respecting these requirements will be rejected.
     * NOTE ABOUT THE TOOL CHAIN:
         This tool chain was originally built for testing purpose not for programmer.
         Therefore, bugs are present and code is NOT fully tested. We are improving this
-        but there is still a lot of work to be done. The assembler and the linker are
+        but there is still a lot of work to be done. The linker is
         more than likely going to be re-written.
     * All tool chain related code is here. For example, the code allowing to parse and link files
     is in there. The debugger code is there too.
@@ -110,7 +109,6 @@ Voici une liste d'éléments qui demandent encore beaucoup de travail:
 * Compilateur C (ou autre langage) (aucun support actuellement)
 * Ajout au débugueur (step into, step over, ...)
 * Amélioration du format".o" (current format is prone to bugs)
-* Réécriture de l'assembleur
 
 
 Please note that any contribution has to follow GPLv2 licence. Also, any contribution
@@ -133,8 +131,8 @@ Any code contribution not respecting these requirements will be rejected.
         et non pas pour être utilisés par le programmeur. Ainsi, des problèmes sont
         présents dans le code et ce dernier n'a pas été entièrement testé. Nous
         travaillons à l'amélioration des outils mais plusieurs autres éléments demandent
-        aussi de l'attention. L'assembleur et l'éditeur de liens seront probablement
-        ré-écrits.
+        aussi de l'attention. L'éditeur de liens sera probablement
+        ré-écrit.
     * L'ensemble du code relié aux outils de développement est ici. Par exemple, le code permettant
     l'édition des liens et l'analyseur de code est dans ce répertoire. Le code du débogueur y est
     aussi présent.

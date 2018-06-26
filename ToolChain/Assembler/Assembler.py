@@ -23,7 +23,7 @@ __author__ = "CSE"
 __copyright__ = "Copyright 2018, CSE"
 __credits__ = ["CSE"]
 __license__ = "GPL"
-__version__ = "2.1"
+__version__ = "3.0"
 __maintainer__ = "CSE"
 __status__ = "Dev"
 

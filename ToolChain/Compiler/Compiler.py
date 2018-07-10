@@ -23,7 +23,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 from ToolChain.Compiler.Constants import ACCEPTED_TYPES, \
                                          IGNORE_CHARS, \
                                          BOOLEAN_OPERATORS, \
-                                         ALLOWED_CHARS
+                                         ALLOWED_CHARS, \
+                                         ARRAY_PATTERN
 
 from ToolChain.Compiler.MathParser import tokenize, \
                                           infixToPostfix, \
@@ -690,7 +691,17 @@ class Compiler:
                 if self.functionArg in self.varList:
                     # must be a valid variable to pass into function
                     output.write("    PUSH #" + str(self.varLocation[self.functionArg]) + "\n")
+
+                elif re.match(ARRAY_PATTERN, self.functionArg):
+                    # variable is an array index
+                    match = re.search(ARRAY_PATTERN, self.functionArg)
+                    operands = match.group(0)
+                    operands = operands.split("[")
+                    operands[1] = operands[1].replace("]", "")
+                    output.write("    PUSH #" + str(self.varLocation[operands[0]] + int(operands[1]) * 4) + "\n")
+
                 else:
+                    # variable wasn't declared or isn't valid
                     raise ValueError("Invalid variable at line {}".format(self.lineno))
                 self.expectFlag = 4
                 self.argCount += 1
@@ -966,37 +977,63 @@ class Compiler:
         """
 
         if self.expectFlag == 0:
+            # we expect to read the array's size until we read "]"
+
             if char != "]":
+                # if the character read isn't a closing bracket, we assume it's part of the size
                 try:
                     int(char)
                 except ValueError as e:
                     raise ValueError("Array size declaration invalid at line {}".format(self.lineno))
                 self.arrayLength += char
+
             else:
-                self.arrayList[self.currentVar] = int(self.arrayLength)
-                self.varLocation[self.currentVar] = self.memoryLocation
-                self.memoryLocation += int(self.arrayLength) * 4
-                self.arrayLength = ""
-                self.expectFlag = 1
+                # otherwise, we read "]" and we're ready to prepare the newly declared array
+                if self.arrayLength is not None:
+                    self.arrayList[self.currentVar] = int(self.arrayLength)
+                    self.varLocation[self.currentVar] = self.memoryLocation
+                    self.memoryLocation += int(self.arrayLength) * 4
+                    self.arrayLength = ""
+                    self.expectFlag = 1
+                else:
+                    # we have a case where nothing was put in the brackets, ex: "int a[];"
+                    raise ValueError("Empty array size at line {}".format(self.lineno))
 
         elif self.expectFlag == 1:
+            # at this point, we're either done with the array declaration, or we're assigning values to the array
+
             if char == " ":
+                # we can still accept empty spaces before a key token is read
                 pass
+
             elif char == "=":
+                # we're assigning values to the array, so we move on to the next section
                 self.expectFlag = 2
+
             elif char == ";":
+                # we're done with the declaration.
                 self.expectFlag = 0
+                self.currentVar = ""
+                self.currentType = ""
                 self.state = 5
+
             else:
+                # we read a character that's not a semicolon, equal sign, or space
                 raise ValueError("Invalid syntax at line {}".format(self.lineno))
 
         elif self.expectFlag == 2:
             # array has an assignment immediately after its declaration
+
             if char == " ":
+                # we can still accept empty spaces before a key token is read
                 pass
+
             elif char == "{":
+                # initial array declarations can only be assigned values in its entirety. ex: int a[2] = {1,2,3};
                 self.expectFlag = 3
+
             else:
+                # we can only accept an opening curly brace at this point
                 raise ValueError("Invalid array value assignment at line {}".format(self.lineno))
 
         elif self.expectFlag == 3:
@@ -1005,30 +1042,45 @@ class Compiler:
                 self.expectFlag = 4
 
             else:
+                # otherwise we just append the character to the math formula
                 self.mathFormula += char
 
         elif self.expectFlag == 4:
+            # here we're just waiting for a semi-colon since nothing else can be added at this point
+
             if char == " ":
+                # we can still accept empty spaces before a key token is read
                 pass
+
             elif char == ";":
+                # end of statement, math expression is done, everything is set to go back to state 5.
                 self.assignArrayValues(output)
                 self.expectFlag = 0
                 self.mathFormula = ""
                 self.arrayLength = ""
+                self.currentVar = ""
+                self.currentType = ""
                 self.state = 5
+
             else:
+                # we read something other than a semi-colon or a space
                 raise ValueError("Incorrect syntax at line {}".format(self.lineno))
 
     def state13(self, char, output):
         """
-        This state deals with assigning a value to a specific array index
-        :param char:
-        :param output:
+        This state deals with assigning a value to a specific array index. Here we assume the array has already been
+        declared, and we're simply assigning a value to a specific index.
+        :param char: char, Individual character read from input file
+        :param output: file, output file to write to
         :return:
         """
 
         if self.expectFlag == 0:
+            # here we expect to read the index of the array
+
             if char == "]":
+                # we're done reading characters for the index, so we check if it's a valid integer and within bounds
+
                 try:
                     int(self.arrayLength)
                 except ValueError as e:
@@ -1040,16 +1092,22 @@ class Compiler:
                 self.expectFlag = 1
 
             else:
+                # otherwise, we're still reading the index (though realistically it'll probably just be 1-2 chars)
                 self.arrayLength += char
 
         elif self.expectFlag == 1:
+
             if char == " ":
+                # we can still accept empty spaces before a key token is read
                 pass
             elif char == "=":
                 self.expectFlag = 3
 
         elif self.expectFlag == 3:
+            # here we keep reading input for the math formula until the end of the input ";"
+
             if char == ";":
+                # we're done reading the math expression, so we call the mathparser functions and reset
                 tokens = tokenize(self.mathFormula)
                 postfix = infixToPostfix(tokens)
                 evaluatePostfix(postfix, self.varList, self.varLocation, self.methodList[self.currentMethod],
@@ -1061,7 +1119,9 @@ class Compiler:
                 self.mathFormula = ""
                 self.arrayLength = ""
                 self.state = 5
+
             else:
+                # otherwise the char gets added to the math formula
                 self.mathFormula += char
 
     def validName(self, name):
@@ -1155,7 +1215,4 @@ class Compiler:
             output.write("    MEMW [4] #" + str(element) + " #" + str(startingLocation) + "\n")
             startingLocation += 4
 
-
-    def arrayBoundsCheck(self):
-        pass
 

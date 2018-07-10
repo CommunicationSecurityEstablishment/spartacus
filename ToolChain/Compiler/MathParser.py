@@ -144,6 +144,7 @@ def evaluatePostfix(postfix, variableList, variableLocation, methodVariables, ar
                  pass
 
             elif re.match(ARRAY_PATTERN, operand1):
+                # Our variable is an array, and must be in the pattern "var[1]". We use regex to sort the information
                 match = re.search(ARRAY_PATTERN, operand1)
                 operands = match.group(0)
                 operands = operands.split("[")
@@ -189,6 +190,7 @@ def evaluatePostfix(postfix, variableList, variableLocation, methodVariables, ar
                 pass
 
             elif re.match(ARRAY_PATTERN, operand2):
+                # Our variable is an array, and must be in the pattern "var[1]". We use regex to sort the information
                 match = re.search(ARRAY_PATTERN, operand2)
                 operands = match.group(0)
                 operands = operands.split("[")
@@ -282,7 +284,9 @@ def evaluatePostfix(postfix, variableList, variableLocation, methodVariables, ar
         operands[1] = operands[1].replace("]", "")
 
         if operands[0] not in arrayList:
+            # name of variable must be a valid array declaration
             raise ValueError("Invalid variable.")
+
         if int(operands[1]) > int(arrayList[operands[0]] - 1):
             # Can't access an index that doesn't exist!
             raise ValueError("Array index out of bounds.")

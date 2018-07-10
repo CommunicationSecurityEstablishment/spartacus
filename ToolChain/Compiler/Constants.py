@@ -88,7 +88,7 @@ TOKEN_SEPARATOR = re.compile(r'\s*(%s|%s|%s|%s|%s|%s)\s*' % (
                   re.escape(DIVISION))
 )
 
-ARRAY_PATTERN = ".\[[0-9]\]"
+ARRAY_PATTERN = "\w*\[[0-9]\]"
 
 
 

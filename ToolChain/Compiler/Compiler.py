@@ -68,6 +68,7 @@ class Compiler:
     whileList = []               # List containing the names of while loops
     arrayList = {}               # Dict containing variables that are arrays
     arrayLength = ""             # Length of current array variable being evaluated
+    pointerList = []             # List containing variables that are pointers
 
     def __init__(self, inputFile=None, outputFile=None):
         """
@@ -171,6 +172,18 @@ class Compiler:
 
         elif self.state == 13:
             self.state13(char, output)
+
+        elif self.state == 14:
+            self.state14(char, output)
+
+        elif self.state == 15:
+            self.state15(char, output)
+
+        elif self.state == 16:
+            self.state16(char, output)
+
+        elif self.state == 17:
+            self.state17(char, output)
 
     def state0(self, char, output):
         """
@@ -394,6 +407,10 @@ class Compiler:
             # whitespace or newline characters when not expecting a particular input
             pass
 
+        elif char == "*" and self.expectFlag == 0:
+            # assigning a value to a pointer, it should be the first thing we read
+            self.state = 17
+
         elif char == " " and self.expectFlag == 1:
             # we read a space, now we evaluate our indicator to determine what sort of operation we're dealing with
             if self.identifier == "if":
@@ -441,20 +458,39 @@ class Compiler:
                 self.functionCall = self.identifier
                 self.identifier = ""
 
+            elif self.identifier in self.pointerList:
+                # identifier is a pointer
+                self.expectFlag = 2
+                self.state = 14
+                self.currentVar = self.identifier
+                self.identifier = ""
+
             else:
                 # identifier was not valid
+                print(self.identifier)
                 raise ValueError("Error at line {}".format(self.lineno))
 
         elif char == "=" and self.expectFlag == 1:
             # here we have a variable assignment. Variable must be already declared in this case
             if (self.identifier in self.varList) or self.identifier in self.methodList[self.currentMethod]:
                 self.expectFlag = 0
+                self.currentVar = self.identifier
                 self.state = 7
+                self.identifier = ""
+
+            elif self.identifier in self.pointerList:
+                # identifier is a pointer
+                self.expectFlag = 0
+                self.state = 15
+                self.currentVar = self.identifier
+                self.identifier = ""
+
             else:
                 raise ValueError("Invalid assignment at line {}: must be valid variable".format(self.lineno))
 
         elif char == "[" and self.expectFlag == 1:
             # this implies an already declared array
+            self.currentVar = self.identifier
             self.expectFlag = 0
             self.identifier = ""
             self.state = 13
@@ -526,6 +562,10 @@ class Compiler:
             # ignore spaces/new line chars if we're not expecting any input in particular
             pass
 
+        elif char == "*" and self.expectFlag == 0:
+            # we're dealing with a new pointer variable in this case
+            self.state = 14
+
         elif char == " " and self.expectFlag == 1:
             # we have the variable name, now we move to the next phase to determine appropriate action
             self.expectFlag = 2
@@ -559,6 +599,7 @@ class Compiler:
             elif char == "=":
                 # variable assignment. if the variable was not in the list, we add it
                 if (self.currentVar not in self.varList) and self.currentVar not in self.methodList[self.currentMethod]:
+                    # we're dealing with a new variable
                     self.varList.append(self.currentVar)
                     self.varLocation[self.currentVar] = self.memoryLocation
                     self.memoryLocation += 4
@@ -605,6 +646,10 @@ class Compiler:
             else:
                 # otherwise, the parentheses is just part of a normal math expression
                 self.mathFormula += char
+
+        elif char == "*":
+            # we're dereferencing a pointer, so we need to handle this differently than a normal variable assignment
+            self.state = 16
 
         elif char == " " and self.expectFlag == 1:
             # we read a space, so we evaluate what the math formula holds thus far.
@@ -677,6 +722,15 @@ class Compiler:
             if char == ",":
                 if self.functionArg in self.varList:
                     output.write("    PUSH #" + str(self.varLocation[self.functionArg]) + "\n")
+
+                elif re.match(ARRAY_PATTERN, self.functionArg):
+                    # variable is an array index
+                    match = re.search(ARRAY_PATTERN, self.functionArg)
+                    operands = match.group(0)
+                    operands = operands.split("[")
+                    operands[1] = operands[1].replace("]", "")
+                    output.write("    PUSH #" + str(self.varLocation[operands[0]] + int(operands[1]) * 4) + "\n")
+
                 else:
                     raise ValueError("Invalid variable at line {}".format(self.lineno))
                 self.expectFlag = 1
@@ -753,6 +807,7 @@ class Compiler:
                     self.functionCall = ""
                     self.functionArg = ""
                     self.mathFormula = ""
+                    self.currentVar = ""
                     self.argCount = 0
                     self.expectFlag = 0
 
@@ -1122,6 +1177,270 @@ class Compiler:
 
             else:
                 # otherwise the char gets added to the math formula
+                self.mathFormula += char
+
+    def state14(self, char, output):
+        """
+        This method deals with initialization of pointers. Pointer variable can only be assigned a single variable,
+        with the & prefix. The variable must already be declared, and cannot be paired with any other operand.
+        :param char: char, Individual character read from input file
+        :param output: file, output file to write to
+        :return:
+        """
+
+        if self.expectFlag == 0 and char == " ":
+            pass
+
+        elif self.expectFlag == 0:
+            self.currentVar += char
+            self.expectFlag = 1
+
+        elif self.expectFlag == 1:
+            if char in IGNORE_CHARS:
+                self.expectFlag = 2
+                self.validName(self.currentVar)
+            elif char == "=":
+                self.state = 15
+                self.validName(self.currentVar)
+                self.pointerList.append(self.currentVar)
+                self.varLocation[self.currentVar] = self.memoryLocation
+                self.memoryLocation += 4
+            elif char == ";":
+                self.state = 5
+                self.pointerList.append(self.currentVar)
+                self.varLocation[self.currentVar] = self.memoryLocation
+                self.memoryLocation += 4
+                self.currentVar = ""
+                self.currentType = ""
+                self.expectFlag = 0
+
+            else:
+                self.currentVar += char
+
+        elif self.expectFlag == 2:
+            if char in IGNORE_CHARS:
+                pass
+            elif char == "=":
+                self.state = 15
+                self.expectFlag = 0
+                self.pointerList.append(self.currentVar)
+                self.varLocation[self.currentVar] = self.memoryLocation
+                self.memoryLocation += 4
+
+            elif char == ";":
+                self.state = 5
+                self.pointerList.append(self.currentVar)
+                self.varLocation[self.currentVar] = self.memoryLocation
+                self.memoryLocation += 4
+                self.currentVar = ""
+                self.currentType = ""
+                self.expectFlag = 0
+
+            else:
+                raise ValueError("Incorrect syntax at line {}".format(self.lineno))
+
+    def state15(self, char, output):
+        """
+        This method assigns a value to a pointer. The value must be a valid memory address (and must thus be referenced
+        by a valid variable using the & character).
+        :param char: char, Individual character read from input file
+        :param output: file, output file to write to
+        :return:
+        """
+
+        if self.expectFlag == 0:
+            if char in IGNORE_CHARS:
+                pass
+            elif char == "&":
+                self.expectFlag = 1
+            else:
+                print(char)
+                raise ValueError("Incorrect syntax at line {}".format(self.lineno))
+
+        elif self.expectFlag == 1:
+            if char in IGNORE_CHARS:
+                if self.mathFormula in self.varList:
+                    pass
+                elif self.mathFormula in self.methodList[self.currentMethod]:
+                    pass
+                elif re.match(ARRAY_PATTERN, self.functionArg):
+                    # variable is an array index
+                    match = re.search(ARRAY_PATTERN, self.functionArg)
+                    operands = match.group(0)
+                    operands = operands.split("[")
+                    operands[1] = operands[1].replace("]", "")
+                else:
+                    raise ValueError("Invalid variable name at line {}".format(self.lineno))
+                self.expectFlag = 2
+
+            elif char == ";":
+                if self.mathFormula in self.varList:
+                    output.write("    MEMW [4] #" + str(self.varLocation[self.mathFormula]) + " #" +
+                                 str(self.varLocation[self.currentVar]) + "\n")
+
+                elif self.mathFormula in self.methodList[self.currentMethod]:
+                    output.write("    MOV $A2 $S2\n")
+                    output.write("    ADD #" + str(self.methodList[self.currentMethod][self.currentVar][1] * 4)
+                                 + " $A2\n")
+                    output.write("    MEMW [4] $A2 #" + str(self.varLocation[self.currentVar]) + "\n")
+
+                elif re.match(ARRAY_PATTERN, self.functionArg):
+                    # variable is an array index
+                    match = re.search(ARRAY_PATTERN, self.functionArg)
+                    operands = match.group(0)
+                    operands = operands.split("[")
+                    operands[1] = operands[1].replace("]", "")
+                    output.write("    #" + str(self.varLocation[self.mathFormula] + operands[1] * 4) + " #" +
+                                 str(self.varLocation[self.currentVar]) + "\n")
+
+                else:
+                    raise ValueError("Invalid variable name at line {}".format(self.lineno))
+                self.expectFlag = 0
+                self.currentVar = ""
+                self.currentType = ""
+                self.mathFormula = ""
+                self.state = 5
+
+            else:
+                self.mathFormula += char
+
+        elif self.expectFlag == 2:
+            if char in IGNORE_CHARS:
+                pass
+            elif char == ";":
+                if self.mathFormula in self.varList:
+                    output.write("    MEMW [4] #" + str(self.varLocation[self.mathFormula]) + " #" +
+                                 str(self.varLocation[self.currentVar] + "\n"))
+
+                elif self.mathFormula in self.methodList[self.currentMethod]:
+                    output.write("    MOV $A2 $S2\n")
+                    output.write("    ADD #" + str(self.methodList[self.currentMethod][self.currentVar][1] * 4)
+                                 + " $A2\n")
+                    output.write("    MEMW [4] $A2 #" + str(self.varLocation[self.currentVar]) + "\n")
+
+                elif re.match(ARRAY_PATTERN, self.functionArg):
+                    # variable is an array index
+                    match = re.search(ARRAY_PATTERN, self.functionArg)
+                    operands = match.group(0)
+                    operands = operands.split("[")
+                    operands[1] = operands[1].replace("]", "")
+                    output.write("    #" + str(self.varLocation[self.mathFormula] + operands[1] * 4) + " #" +
+                                 str(self.varLocation[self.currentVar]) + "\n")
+
+                else:
+                    raise ValueError("Invalid variable name at line {}".format(self.lineno))
+                self.expectFlag = 0
+                self.currentVar = ""
+                self.currentType = ""
+                self.mathFormula = ""
+                self.state = 5
+            else:
+                raise ValueError("Syntax error at line {}".format(self.lineno))
+
+    def state16(self, char, output):
+        """
+        This state deals with dereferencing a pointer. Any variable can be assigned a pointer dereference, but it must
+        stand alone as an operand. The memory location stored in the pointer must be a valid variable. It should be
+        noted that pointers cannot dereference other pointers.
+        :param char: char, Individual character read from input file
+        :param output: file, output file to write to
+        :return:
+        """
+
+        if char in IGNORE_CHARS and self.expectFlag == 0:
+            pass
+
+        elif self.expectFlag == 0:
+            self.mathFormula += char
+            self.expectFlag = 1
+
+        elif self.expectFlag == 1:
+            if char == " ":
+                self.expectFlag = 2
+
+            elif char == ";":
+                if self.mathFormula not in self.pointerList:
+                    raise ValueError("Invalid pointer variable at line {}".format(self.lineno))
+                output.write("    MEMR [4] #" + str(self.varLocation[self.mathFormula]) + " $A\n")
+                output.write("    MEMR [4] $A $B\n")
+                output.write("    MEMW [4] $B #" + str(self.varLocation[self.currentVar]) + "\n")
+                self.expectFlag = 0
+                self.currentVar = ""
+                self.currentType = ""
+                self.state = 5
+            else:
+                self.mathFormula += char
+
+        elif self.expectFlag == 2:
+            if char in IGNORE_CHARS:
+                pass
+            elif char == ";":
+                if self.mathFormula not in self.pointerList:
+                    raise ValueError("Invalid pointer variable at line {}".format(self.lineno))
+                output.write("    MEMR [4] #" + str(self.varLocation[self.mathFormula]) + " $A\n")
+                output.write("    MEMR [4] $A $B\n")
+                output.write("    MEMW [4] $B #" + str(self.varLocation[self.currentVar]) + "\n")
+                self.expectFlag = 0
+                self.currentVar = ""
+                self.currentType = ""
+                self.state = 5
+
+            else:
+                raise ValueError("Incorrect syntax at line {}".format(self.lineno))
+
+    def state17(self, char, output):
+        """
+        This method allows you to assign an immediate value to a pointer. You're risking accessing an invalid memory
+        location by doing this, however. The format should be "*var = int"
+        :param char:
+        :param output:
+        :return:
+        """
+
+        if char in IGNORE_CHARS and self.expectFlag == 0:
+            pass
+
+        elif self.expectFlag == 0:
+            self.currentVar += char
+            self.expectFlag = 1
+
+        elif self.expectFlag == 1:
+
+            if char == "=":
+                self.expectFlag = 3
+                if self.currentVar not in self.pointerList:
+                    raise ValueError("Invalid pointer variable at line {}".format(self.lineno))
+
+            elif char in IGNORE_CHARS:
+                self.expectFlag = 2
+
+            else:
+                self.currentVar += char
+
+        elif self.expectFlag == 2:
+            if char in IGNORE_CHARS:
+                pass
+            elif char == "=":
+                self.expectFlag = 3
+                if self.currentVar not in self.pointerList:
+                    raise ValueError("Invalid pointer variable at line {}".format(self.lineno))
+            else:
+                raise ValueError("Invalid syntax at line {}".format(self.lineno))
+
+        elif self.expectFlag == 3:
+            if char == ";":
+                tokens = tokenize(self.mathFormula)
+                postfix = infixToPostfix(tokens)
+                evaluatePostfix(postfix, self.varList, self.varLocation, self.methodList[self.currentMethod],
+                                self.arrayList, output)
+                output.write("    MEMW [4] $A #" + str(self.varLocation[self.currentVar]) + "\n")
+                self.currentVar = ""
+                self.currentType = ""
+                self.expectFlag = 0
+                self.mathFormula = ""
+                self.state = 5
+
+            else:
                 self.mathFormula += char
 
     def validName(self, name):

@@ -143,7 +143,7 @@ def evaluatePostfix(postfix, variableList, variableLocation, methodVariables, ar
                 # This is simply a register that was pushed onto the stack. We can keep it as is
                  pass
 
-            elif re.match(ARRAY_PATTERN, operand1):
+            elif re.match(ARRAY_PATTERN, str(operand1)):
                 # Our variable is an array, and must be in the pattern "var[1]". We use regex to sort the information
                 match = re.search(ARRAY_PATTERN, operand1)
                 operands = match.group(0)
@@ -189,7 +189,7 @@ def evaluatePostfix(postfix, variableList, variableLocation, methodVariables, ar
                 # This is simply a register that was pushed onto the stack. We can keep it as is
                 pass
 
-            elif re.match(ARRAY_PATTERN, operand2):
+            elif re.match(ARRAY_PATTERN, str(operand2)):
                 # Our variable is an array, and must be in the pattern "var[1]". We use regex to sort the information
                 match = re.search(ARRAY_PATTERN, operand2)
                 operands = match.group(0)
@@ -276,7 +276,7 @@ def evaluatePostfix(postfix, variableList, variableLocation, methodVariables, ar
         output.write("    ADD #" + str(int(methodVariables[result][1]) * 4) + " $B2\n")
         output.write("    MEMR [4] $B2 $A\n")
 
-    elif re.match(ARRAY_PATTERN, result):
+    elif re.match(ARRAY_PATTERN, str(result)):
         # our last operand is an array at a specific index. We find the index, and add the offset to the variable loc.
         match = re.search(ARRAY_PATTERN, result)
         operands = match.group(0)

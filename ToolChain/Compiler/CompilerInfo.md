@@ -10,6 +10,7 @@ The compiler currently supports the following features:
 * Arrays
 * Function calls
 * Multiple function declaration
+* Pointers
 
 ##Restrictions
 The compiler currently has some restrictions:
@@ -20,6 +21,7 @@ for parentheses to fix this)
 * Math expressions for variable assignment may only have a maximum of 6 operands. This isn't the real 
 maximum, as it varies depending on how many variables are used. This maximum is simply for consistency.
 * Function calls can't be used in complex variable assignment. They can only be used if it's the only operand.
+* 
 
 - - -
 This file is part of Spartacus project

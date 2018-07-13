@@ -1189,23 +1189,32 @@ class Compiler:
         """
 
         if self.expectFlag == 0 and char == " ":
+            # we can still accept empty spaces before a key token is read
             pass
 
         elif self.expectFlag == 0:
+            # here we read the first non-space character
             self.currentVar += char
             self.expectFlag = 1
 
         elif self.expectFlag == 1:
+            # after reading the first non-space character, we read the name of the variable for the pointer
+
             if char in IGNORE_CHARS:
+                # we can still accept empty spaces before a key token is read
                 self.expectFlag = 2
                 self.validName(self.currentVar)
+
             elif char == "=":
+                # equals sign means we're assigning a value to the pointer (memory address)
                 self.state = 15
                 self.validName(self.currentVar)
                 self.pointerList.append(self.currentVar)
                 self.varLocation[self.currentVar] = self.memoryLocation
                 self.memoryLocation += 4
+
             elif char == ";":
+                # end of declaration, we simple allocate memory location without giving a value
                 self.state = 5
                 self.pointerList.append(self.currentVar)
                 self.varLocation[self.currentVar] = self.memoryLocation
@@ -1215,12 +1224,18 @@ class Compiler:
                 self.expectFlag = 0
 
             else:
+                # otherwise we assume we're still reading the name of the variable being declared
                 self.currentVar += char
 
         elif self.expectFlag == 2:
+            # We read a space, so we expect either another space or newline, or a valid operator
+
             if char in IGNORE_CHARS:
+                # we can still accept empty spaces before a key token is read
                 pass
+
             elif char == "=":
+                # equals sign means we're assigning a value to the pointer (memory address)
                 self.state = 15
                 self.expectFlag = 0
                 self.pointerList.append(self.currentVar)
@@ -1228,6 +1243,7 @@ class Compiler:
                 self.memoryLocation += 4
 
             elif char == ";":
+                # end of declaration, we simple allocate memory location without giving a value
                 self.state = 5
                 self.pointerList.append(self.currentVar)
                 self.varLocation[self.currentVar] = self.memoryLocation
@@ -1237,6 +1253,7 @@ class Compiler:
                 self.expectFlag = 0
 
             else:
+                # we read something other than "=" or ";" in this context, which would be incorrect
                 raise ValueError("Incorrect syntax at line {}".format(self.lineno))
 
     def state15(self, char, output):
@@ -1249,43 +1266,67 @@ class Compiler:
         """
 
         if self.expectFlag == 0:
+            # we can read spaces or new line chars, but the first non-empty character MUST be an ampersand "&"
+
             if char in IGNORE_CHARS:
                 pass
+
             elif char == "&":
                 self.expectFlag = 1
+
             else:
-                print(char)
+                # We read something other than space, new line, or ampersand
                 raise ValueError("Incorrect syntax at line {}".format(self.lineno))
 
         elif self.expectFlag == 1:
+            # here we read the name of the variable whose address we're assigning to the pointer
+
             if char in IGNORE_CHARS:
+                # if we read a space, we evaluate the variable name to see if it exists
+
                 if self.mathFormula in self.varList:
+                    # variable is in regular variable list, we're good and can move on to flag 2
                     pass
+
                 elif self.mathFormula in self.methodList[self.currentMethod]:
+                    # variable is argument passed into current method, so variable is valid
                     pass
+
                 elif re.match(ARRAY_PATTERN, self.functionArg):
-                    # variable is an array index
+                    # variable is an array index. we parse the variable name and index to determine if they're valid
                     match = re.search(ARRAY_PATTERN, self.functionArg)
                     operands = match.group(0)
                     operands = operands.split("[")
                     operands[1] = operands[1].replace("]", "")
+
+                    if operands[0] not in self.arrayList:
+                        raise ValueError("Invalid array variable at line {}".format(self.lineno))
+                    if operands[1] > self.arrayList[self.currentVar] - 1:
+                        raise ValueError("Array index out of bounds at line {}".format(self.lineno))
+
                 else:
+                    # variable didn't match any pattern or was not present in any valid list
                     raise ValueError("Invalid variable name at line {}".format(self.lineno))
+
                 self.expectFlag = 2
 
             elif char == ";":
+                # we immediately read the end of the statement, so we evaluate the variable and write the correct output
+
                 if self.mathFormula in self.varList:
+                    # variable is in regular list, so we assign its memory location to the pointer
                     output.write("    MEMW [4] #" + str(self.varLocation[self.mathFormula]) + " #" +
                                  str(self.varLocation[self.currentVar]) + "\n")
 
                 elif self.mathFormula in self.methodList[self.currentMethod]:
+                    # variable is passed in as argument, we just write the pointer register's value at the right index
                     output.write("    MOV $A2 $S2\n")
                     output.write("    ADD #" + str(self.methodList[self.currentMethod][self.currentVar][1] * 4)
                                  + " $A2\n")
                     output.write("    MEMW [4] $A2 #" + str(self.varLocation[self.currentVar]) + "\n")
 
                 elif re.match(ARRAY_PATTERN, self.functionArg):
-                    # variable is an array index
+                    # variable is an array index, we get the memory location at index 0 and add the correct offset
                     match = re.search(ARRAY_PATTERN, self.functionArg)
                     operands = match.group(0)
                     operands = operands.split("[")
@@ -1309,17 +1350,19 @@ class Compiler:
                 pass
             elif char == ";":
                 if self.mathFormula in self.varList:
+                    # variable is in regular list, so we assign its memory location to the pointer
                     output.write("    MEMW [4] #" + str(self.varLocation[self.mathFormula]) + " #" +
                                  str(self.varLocation[self.currentVar] + "\n"))
 
                 elif self.mathFormula in self.methodList[self.currentMethod]:
+                    # variable is passed in as argument, we just write the pointer register's value at the right index
                     output.write("    MOV $A2 $S2\n")
                     output.write("    ADD #" + str(self.methodList[self.currentMethod][self.currentVar][1] * 4)
                                  + " $A2\n")
                     output.write("    MEMW [4] $A2 #" + str(self.varLocation[self.currentVar]) + "\n")
 
                 elif re.match(ARRAY_PATTERN, self.functionArg):
-                    # variable is an array index
+                    # variable is an array index, we get the memory location at index 0 and add the correct offset
                     match = re.search(ARRAY_PATTERN, self.functionArg)
                     operands = match.group(0)
                     operands = operands.split("[")
@@ -1328,13 +1371,17 @@ class Compiler:
                                  str(self.varLocation[self.currentVar]) + "\n")
 
                 else:
+                    # we already did the check in flag 1, so this technically shouldn't execute and something went wrong
                     raise ValueError("Invalid variable name at line {}".format(self.lineno))
+
                 self.expectFlag = 0
                 self.currentVar = ""
                 self.currentType = ""
                 self.mathFormula = ""
                 self.state = 5
+
             else:
+                # we're expecting the end of the statement ";", so anything else in invalid
                 raise ValueError("Syntax error at line {}".format(self.lineno))
 
     def state16(self, char, output):
@@ -1348,44 +1395,63 @@ class Compiler:
         """
 
         if char in IGNORE_CHARS and self.expectFlag == 0:
+            # we can still accept empty spaces before a key token is read
             pass
 
         elif self.expectFlag == 0:
+            # we read our first non space character, so we append to mathformula to determine our variable name
             self.mathFormula += char
             self.expectFlag = 1
 
         elif self.expectFlag == 1:
+            # here we read the rest of the variable name until we reach a space character or semi colon
+
             if char == " ":
+                # we read a space, so we're no longer reading variable name
                 self.expectFlag = 2
 
             elif char == ";":
+                # end of statement, the variable must be a valid pointer. We grab the value at the memory location
+                # stored inside the pointer
+
                 if self.mathFormula not in self.pointerList:
                     raise ValueError("Invalid pointer variable at line {}".format(self.lineno))
                 output.write("    MEMR [4] #" + str(self.varLocation[self.mathFormula]) + " $A\n")
                 output.write("    MEMR [4] $A $B\n")
                 output.write("    MEMW [4] $B #" + str(self.varLocation[self.currentVar]) + "\n")
+
                 self.expectFlag = 0
                 self.currentVar = ""
                 self.currentType = ""
                 self.state = 5
+
             else:
+                # otherwise, we're still reading the pointer variable's name
                 self.mathFormula += char
 
         elif self.expectFlag == 2:
+            # at this point, we can keep reading spaces but the next non-space character must be a semi-colon
+
             if char in IGNORE_CHARS:
                 pass
+
             elif char == ";":
+                # end of statement, the variable must be a valid pointer. We grab the value at the memory location
+                # stored inside the pointer
+
                 if self.mathFormula not in self.pointerList:
                     raise ValueError("Invalid pointer variable at line {}".format(self.lineno))
                 output.write("    MEMR [4] #" + str(self.varLocation[self.mathFormula]) + " $A\n")
                 output.write("    MEMR [4] $A $B\n")
                 output.write("    MEMW [4] $B #" + str(self.varLocation[self.currentVar]) + "\n")
+
                 self.expectFlag = 0
                 self.currentVar = ""
                 self.currentType = ""
                 self.state = 5
 
             else:
+                # we didn't read a semi colon or space character, so the syntax is incorrect
                 raise ValueError("Incorrect syntax at line {}".format(self.lineno))
 
     def state17(self, char, output):
@@ -1398,42 +1464,64 @@ class Compiler:
         """
 
         if char in IGNORE_CHARS and self.expectFlag == 0:
+            # we can still accept empty spaces before a key token is read
             pass
 
         elif self.expectFlag == 0:
+            # first non-space character is read, so we start reading the variable's name
             self.currentVar += char
             self.expectFlag = 1
 
         elif self.expectFlag == 1:
+            # here we read the pointer variable's name
 
             if char == "=":
+                # assignment operator means we're done reading the name. We check if it's in the list
                 self.expectFlag = 3
                 if self.currentVar not in self.pointerList:
                     raise ValueError("Invalid pointer variable at line {}".format(self.lineno))
 
             elif char in IGNORE_CHARS:
+                # we read a space character, so we're done reading the variable name
                 self.expectFlag = 2
 
             else:
+                # otherwise we keep reading the variable's name
                 self.currentVar += char
 
         elif self.expectFlag == 2:
+            # we expect to read an assignment operator, since no other operations are valid for *pointer
+
             if char in IGNORE_CHARS:
+                # we can still read space characters
                 pass
+
             elif char == "=":
+                # assignment operator means we're done reading the name. We check if it's in the list
                 self.expectFlag = 3
                 if self.currentVar not in self.pointerList:
                     raise ValueError("Invalid pointer variable at line {}".format(self.lineno))
+
             else:
+                # there are no other valid characters we can read, so the syntax is incorrect
                 raise ValueError("Invalid syntax at line {}".format(self.lineno))
 
         elif self.expectFlag == 3:
+            # here we read the value that will be assigned to the pointer
+
             if char == ";":
+                # end of statement, we evaluate the mathformula and assign the value to the pointer variable
+
+                if len(self.mathFormula) == 0:
+                    # can't have an empty expression (ex: *pointer = ;)
+                    raise ValueError("Empty operand at line {}".format(self.lineno))
+
                 tokens = tokenize(self.mathFormula)
                 postfix = infixToPostfix(tokens)
                 evaluatePostfix(postfix, self.varList, self.varLocation, self.methodList[self.currentMethod],
                                 self.arrayList, output)
                 output.write("    MEMW [4] $A #" + str(self.varLocation[self.currentVar]) + "\n")
+
                 self.currentVar = ""
                 self.currentType = ""
                 self.expectFlag = 0
@@ -1441,6 +1529,7 @@ class Compiler:
                 self.state = 5
 
             else:
+                # otherwise we keep appending to our math formula
                 self.mathFormula += char
 
     def validName(self, name):

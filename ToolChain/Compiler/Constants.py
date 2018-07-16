@@ -30,11 +30,13 @@ __status__ = "Dev"
 
 import re
 
-ACCEPTED_TYPES = ["int"]
+ACCEPTED_TYPES = ["int", "char"]
 OPERATORS = ['+', '-', '*', '/']
 BOOLEAN_OPERATORS = ["<", ">", "="]
 IGNORE_CHARS = [" ", "\n"]
 REGISTER_NAMES = ["A", "B", "C", "D", "E", "F", "G"]
+SINGLE_QUOTE = "\'"
+DOUBLE_QUOTE = "\""
 
 
 L_PARENTHESES = '('

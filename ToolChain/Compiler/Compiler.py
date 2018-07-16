@@ -24,7 +24,9 @@ from ToolChain.Compiler.Constants import ACCEPTED_TYPES, \
                                          IGNORE_CHARS, \
                                          BOOLEAN_OPERATORS, \
                                          ALLOWED_CHARS, \
-                                         ARRAY_PATTERN
+                                         ARRAY_PATTERN, \
+                                         SINGLE_QUOTE, \
+                                         DOUBLE_QUOTE
 
 from ToolChain.Compiler.MathParser import tokenize, \
                                           infixToPostfix, \
@@ -42,6 +44,13 @@ __status__ = "Dev"
 
 
 class Compiler:
+    """
+    This is a compiler that converts C code to Capua ASM. It currently supports a small subset of the C programming
+    language, and functionality will progressively be added. It makes use of a finite state machine type model, using
+    states to determine the next expected input, and how to handle the information. Consult the documentation for
+    details on supported features.
+    and limitations.
+    """
 
     state = 0                    # "States" are used to determine our next path for processing the C file
     currentVar = ""              # Name of variable being evaluated
@@ -69,6 +78,8 @@ class Compiler:
     arrayList = {}               # Dict containing variables that are arrays
     arrayLength = ""             # Length of current array variable being evaluated
     pointerList = []             # List containing variables that are pointers
+    charList = []                # List containing variables that are chars
+    quoteFlag = ""                # Keeps track of whether we used single or double quote to declare a char variable
 
     def __init__(self, inputFile=None, outputFile=None):
         """
@@ -184,6 +195,12 @@ class Compiler:
 
         elif self.state == 17:
             self.state17(char, output)
+
+        elif self.state == 18:
+            self.state18(char, output)
+
+        elif self.state == 19:
+            self.state19(char, output)
 
     def state0(self, char, output):
         """
@@ -382,22 +399,8 @@ class Compiler:
     def state5(self, char, output):
         """
         Initial evaluation of a line within the body of a method. We read the input and concatenate to identifier
-        string. Once we read a key token we check various cases to see where we need to go with out identifier:
-        space:
-            -valid data type
-            -if statement (we later check for opening parentheses)
-            -variable (already declared)
-            -while loop
-            -return statement
-        "=":
-            -variable assignment only
-        "(":
-            -if statement
-            -while loop
-            -function call (e.g. add(a,b))
-        "}"
-            -end of method, loop, or if statement
-
+        string. Once we read a key token we check various cases to see where we need to go with out identifier. This is
+        where most features can be implemented later.
         :param char: char, Individual character read from input file
         :param output: file, output file to write to
         :return:
@@ -448,7 +451,13 @@ class Compiler:
                 # identifier is a data type, new variable declaration
                 self.currentType = self.identifier
                 self.identifier = ""
-                self.state = 6
+
+                if self.currentType == "int":
+                    # new integer variable declaration goes to state 6
+                    self.state = 6
+                elif self.currentType == "char":
+                    # new char variable declaration goes to state 18
+                    self.state = 18
                 self.expectFlag = 0
 
             elif self.identifier in self.methodList:
@@ -465,6 +474,12 @@ class Compiler:
                 self.currentVar = self.identifier
                 self.identifier = ""
 
+            elif self.identifier in self.charList:
+                self.expectFlag = 0
+                self.currentVar = self.identifier
+                self.identifier = ""
+                self.state = 19
+
             else:
                 # identifier was not valid
                 print(self.identifier)
@@ -472,6 +487,7 @@ class Compiler:
 
         elif char == "=" and self.expectFlag == 1:
             # here we have a variable assignment. Variable must be already declared in this case
+
             if (self.identifier in self.varList) or self.identifier in self.methodList[self.currentMethod]:
                 self.expectFlag = 0
                 self.currentVar = self.identifier
@@ -497,6 +513,7 @@ class Compiler:
 
         elif char == "(" and self.expectFlag == 1:
             # immediately after the identifier, we read an opening parentheses. Here we cover all possible cases
+
             if self.identifier in self.methodList:
                 # identifier is a function call
                 self.state = 8
@@ -525,6 +542,7 @@ class Compiler:
 
         elif char == "}":
             # end of method, if statement, or while loop
+
             if self.nestedFlag == 0:
                 # if we aren't in any while/if statements, this is the end of our method
                 self.state = 0
@@ -592,6 +610,7 @@ class Compiler:
 
         elif self.expectFlag == 2:
             # We reach this step if we have the variable name and we read at least one space
+
             if char in IGNORE_CHARS:
                 # we may keep reading spaces/ new line until we reach a relevant token
                 pass
@@ -639,6 +658,7 @@ class Compiler:
 
         elif char == "(" and self.expectFlag == 1:
             # we read an opening parentheses, it could either be a function call or part of a normal math expression
+
             if self.mathFormula in self.methodList:
                 # if we have a function call for a variable assignment, we jump to state 8 which deals with functions
                 self.functionCall = self.mathFormula
@@ -653,6 +673,7 @@ class Compiler:
 
         elif char == " " and self.expectFlag == 1:
             # we read a space, so we evaluate what the math formula holds thus far.
+
             if self.mathFormula in self.methodList:
                 # if we have a function call for a variable assignment, we jump to state 8 which deals with functions
                 self.functionCall = self.mathFormula
@@ -1147,7 +1168,7 @@ class Compiler:
                 self.expectFlag = 1
 
             else:
-                # otherwise, we're still reading the index (though realistically it'll probably just be 1-2 chars)
+                # otherwise, we're still reading the index
                 self.arrayLength += char
 
         elif self.expectFlag == 1:
@@ -1157,6 +1178,8 @@ class Compiler:
                 pass
             elif char == "=":
                 self.expectFlag = 3
+            else:
+                raise ValueError("Syntax error at line {}".format(self.lineno))
 
         elif self.expectFlag == 3:
             # here we keep reading input for the math formula until the end of the input ";"
@@ -1531,6 +1554,121 @@ class Compiler:
             else:
                 # otherwise we keep appending to our math formula
                 self.mathFormula += char
+
+    def state18(self, char, output):
+        """
+        This state takes in the name of the char variable, then appends it to the char list.
+        :param char:
+        :param output:
+        :return:
+        """
+
+        if char in IGNORE_CHARS and self.expectFlag == 0:
+            pass
+        elif self.expectFlag == 0:
+            self.currentVar += char
+            self.expectFlag = 1
+
+        elif self.expectFlag == 1:
+
+            if char in IGNORE_CHARS:
+                self.expectFlag = 2
+
+            elif char == ";":
+                self.charList.append(self.currentVar)
+                self.varLocation[self.currentVar] = self.memoryLocation
+                self.memoryLocation += 4
+                self.currentVar = ""
+                self.state = 5
+                self.expectFlag = 0
+                self.currentType = ""
+
+            elif char == "=":
+                self.charList.append(self.currentVar)
+                self.varLocation[self.currentVar] = self.memoryLocation
+                self.memoryLocation += 4
+                self.state = 19
+                self.expectFlag = 0
+
+            else:
+                self.currentVar += char
+
+        elif self.expectFlag == 2:
+            if char in IGNORE_CHARS:
+                pass
+
+            elif char == ";":
+                self.charList.append(self.currentVar)
+                self.varLocation[self.currentVar] = self.memoryLocation
+                self.memoryLocation += 4
+                self.currentVar = ""
+                self.state = 5
+                self.expectFlag = 0
+                self.currentType = ""
+
+            elif char == "=":
+                self.charList.append(self.currentVar)
+                self.varLocation[self.currentVar] = self.memoryLocation
+                self.memoryLocation += 4
+                self.state = 19
+                self.expectFlag = 0
+
+            else:
+                raise ValueError("Invalid syntax at line {}".format(self.lineno))
+
+    def state19(self, char, output):
+        """
+        This method accepts a value for a char variable. It should be noted that chars will always be a single
+        character. The char must be surrounded by either single quotes or double quotes. These must match, meaning we
+        can't use a single quote and double quote at the same time.
+        :param char:
+        :param output:
+        :return:
+        """
+
+        if char in IGNORE_CHARS and self.expectFlag == 0:
+            pass
+
+        elif self.expectFlag == 0:
+            # here we read the value expected for the char variable. This must be a single or double quote
+            self.expectFlag = 1
+            if char == SINGLE_QUOTE:
+                self.quoteFlag = SINGLE_QUOTE
+            elif char == DOUBLE_QUOTE:
+                self.quoteFlag = DOUBLE_QUOTE
+            else:
+                raise ValueError("Incorrect syntax at line {}. Char should begin with \" or \'".format(self.lineno))
+
+        elif self.expectFlag == 1:
+            if char in IGNORE_CHARS:
+                pass
+            else:
+                self.mathFormula = char
+                self.expectFlag = 2
+
+        elif self.expectFlag == 2:
+
+            if char == SINGLE_QUOTE and self.quoteFlag == SINGLE_QUOTE:
+                self.expectFlag = 3
+            elif char == DOUBLE_QUOTE and self.quoteFlag == DOUBLE_QUOTE:
+                self.expectFlag = 3
+            else:
+                raise ValueError("Incorrect syntax at line {}".format(self.lineno))
+
+        elif self.expectFlag == 3:
+
+            if char in IGNORE_CHARS:
+                pass
+            elif char == ";":
+                output.write("    MEMW [4] #" + str(ord(self.mathFormula)) + " #" + str(self.varLocation[self.currentVar]) + "\n")
+                self.currentVar = ""
+                self.state = 5
+                self.expectFlag = 0
+                self.currentType = ""
+                self.mathFormula = ""
+                self.quoteFlag = ""
+            else:
+                raise ValueError("Incorrect syntax at line {}".format(self.lineno))
 
     def validName(self, name):
         """

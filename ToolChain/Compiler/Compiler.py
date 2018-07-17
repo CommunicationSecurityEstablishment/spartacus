@@ -48,8 +48,7 @@ class Compiler:
     This is a compiler that converts C code to Capua ASM. It currently supports a small subset of the C programming
     language, and functionality will progressively be added. It makes use of a finite state machine type model, using
     states to determine the next expected input, and how to handle the information. Consult the documentation for
-    details on supported features.
-    and limitations.
+    details on supported features and limitations.
     """
 
     state = 0                    # "States" are used to determine our next path for processing the C file
@@ -125,6 +124,9 @@ class Compiler:
                 self.parse(x, output)
 
         output.write("end:\n")
+
+        if self.currentMethod != "":
+            raise ValueError("Missing closing curly brace for end of method/if/while.")
 
         try:
             file.close()
@@ -475,7 +477,8 @@ class Compiler:
                 self.identifier = ""
 
             elif self.identifier in self.charList:
-                self.expectFlag = 0
+                # identifier is a char variable
+                self.expectFlag = 4
                 self.currentVar = self.identifier
                 self.identifier = ""
                 self.state = 19
@@ -500,6 +503,13 @@ class Compiler:
                 self.state = 15
                 self.currentVar = self.identifier
                 self.identifier = ""
+
+            elif self.identifier in self.charList:
+                # identifier is a char variable
+                self.expectFlag = 4
+                self.currentVar = self.identifier
+                self.identifier = ""
+                self.state = 19
 
             else:
                 raise ValueError("Invalid assignment at line {}: must be valid variable".format(self.lineno))
@@ -1637,6 +1647,7 @@ class Compiler:
             elif char == DOUBLE_QUOTE:
                 self.quoteFlag = DOUBLE_QUOTE
             else:
+                print(char)
                 raise ValueError("Incorrect syntax at line {}. Char should begin with \" or \'".format(self.lineno))
 
         elif self.expectFlag == 1:
@@ -1670,6 +1681,14 @@ class Compiler:
             else:
                 raise ValueError("Incorrect syntax at line {}".format(self.lineno))
 
+        elif self.expectFlag == 4:
+            if char in IGNORE_CHARS:
+                pass
+            elif char == "=":
+                self.expectFlag = 0
+            else:
+                raise ValueError("Incorrect syntax at line {}".format(self.lineno))
+
     def validName(self, name):
         """
         Verifies whether the variable's name contains only acceptable characters (A-Z, $, _, #)
@@ -1685,7 +1704,7 @@ class Compiler:
         """
         Method checks whether the variable is already present in the list. If so, we raise an error since we can't have
         duplicate variable names. Otherwise, we add it to the list, assign it a memory location, increment the memory
-        location counter, and increase the total variable count.
+        location counter, and increase the total variable count. This is used for state 6 to clean up the code
         :return:
         """
 

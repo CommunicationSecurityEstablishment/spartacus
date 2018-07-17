@@ -16,13 +16,13 @@ The compiler currently supports the following features:
 ##Restrictions
 The compiler currently has some restrictions:
 
-* Currently, arrays may only be indexed with hard coded integers, not variables
+* Currently, arrays may only be indexed with hard coded integers, not variables.
 * If statement and while loop operands can't contain parentheses (we may opt to remove the requirement
-for parentheses to fix this)
+for parentheses to fix this).
 * Math expressions for variable assignment may only have a maximum of 6 operands. This isn't the real 
 maximum, as it varies depending on how many variables are used. This maximum is simply for consistency.
 * Function calls can't be used in complex variable assignment. They can only be used if it's the only operand.
-
+* Pointers can't dereference other pointers.
 
 - - -
 This file is part of Spartacus project

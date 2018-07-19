@@ -26,7 +26,8 @@ from ToolChain.Compiler.Constants import ACCEPTED_TYPES, \
                                          ALLOWED_CHARS, \
                                          ARRAY_PATTERN, \
                                          SINGLE_QUOTE, \
-                                         DOUBLE_QUOTE
+                                         DOUBLE_QUOTE, \
+                                         BINARY_OPERATORS
 
 from ToolChain.Compiler.MathParser import tokenize, \
                                           infixToPostfix, \
@@ -69,6 +70,9 @@ class Compiler:
     ifOperator = ""              # Holds the logical operator between two sides of an if boolean expression
     nestedFlag = 0               # Lets the compiler know if we're in an if statement
     ifLabel = 0                  # For jump instructions, we need a unique label for every if statement
+    binaryLabel = 0              # For unique labels when dealing with binary operators in if/while statements
+    binaryList = []              # To pop/push labels when dealing with binary operators in if/while statements
+    binaryOperator = ""          # Holds the current binary operator being used in if/while statements
     lineno = 0                   # Line number for printing error messages
     functionArg = ""             # Used to read a function call's arguments
     whileLabel = 0               # For while loops, we need a unique label
@@ -485,7 +489,6 @@ class Compiler:
 
             else:
                 # identifier was not valid
-                print(self.identifier)
                 raise ValueError("Error at line {}".format(self.lineno))
 
         elif char == "=" and self.expectFlag == 1:
@@ -879,19 +882,11 @@ class Compiler:
         elif self.expectFlag == 1:
             # we're expecting to read a part of the left hand side's expression. if we read an operator, we evaluate
             # the expression and move on to reading the right hand side's expression.
-            if char in BOOLEAN_OPERATORS:
-                if self.mathFormula == "":
-                    # empty expression (e.g. if ( a > ) )
-                    raise ValueError("Empty expression in if statement at line {}".format(self.lineno))
 
-                tokens = tokenize(self.mathFormula)
-                postfix = infixToPostfix(tokens)
-                evaluatePostfix(postfix, self.varList, self.varLocation, self.methodList[self.currentMethod],
-                                self.arrayList, output)
-                self.ifOperator = self.convertOperatorToFlags(char)
-                self.expectFlag = 2
-                self.mathFormula = ""
-                output.write("    MOV $A $C2\n")
+            if char in BOOLEAN_OPERATORS:
+                # if we read an operator, we may need to read another operator, so we go to flag 4
+                self.ifOperator = char
+                self.expectFlag = 4
 
             else:
                 # otherwise we keep appending to our left hand side's math formula string
@@ -899,19 +894,33 @@ class Compiler:
 
         elif self.expectFlag == 2:
             # here we evaluate the right hand side of an if expression.
-            if char == ")":
-                # closing parentheses, this indicates the end of our expression
+            if char == "{":
+                # opening curly brace, end of entire expression
                 if self.mathFormula == "":
                     # empty expression (e.g. if ( a > ) )
                     raise ValueError("Empty expression in if statement at line {}".format(self.lineno))
 
+                # check the math expression to see if it ends with a closing parentheses (needed for if/while)
+                self.checkForClosingParentheses()
                 tokens = tokenize(self.mathFormula)
                 postfix = infixToPostfix(tokens)
                 evaluatePostfix(postfix, self.varList, self.varLocation, self.methodList[self.currentMethod],
                                 self.arrayList, output)
-                self.expectFlag = 2
                 self.mathFormula = ""
                 output.write("    MOV $A $D2\n")
+                output.write("    CMP $D2 $C2\n")
+                output.write("    JMP " + self.ifOperator + " L" + str(self.ifLabel) + "\n")
+                self.labelList.append(" L" + str(self.ifLabel))
+                self.ifLabel += 1
+                self.state = 5
+                self.expectFlag = 0
+
+                if len(self.binaryList) > 0:
+                    output.write("B" + self.binaryList.pop() + ":\n")
+
+            elif char in BINARY_OPERATORS:
+                # in this case we've got some more expressions to evaluate.
+                self.binaryOperator = char
                 self.expectFlag = 3
 
             else:
@@ -919,25 +928,45 @@ class Compiler:
                 self.mathFormula += char
 
         elif self.expectFlag == 3:
-            # we've finished reading our if statement, now we wait for an opening curly brace
+            tokens = tokenize(self.mathFormula)
+            postfix = infixToPostfix(tokens)
+            evaluatePostfix(postfix, self.varList, self.varLocation, self.methodList[self.currentMethod],
+                            self.arrayList, output)
+            if char == self.binaryOperator:
 
-            if char in IGNORE_CHARS:
-                # we can still read whitespace or newline chars meanwhile
-                pass
-
-            elif char == "{":
-                # we have our opening curly brace, we can go back to state 5 and begin evaluating a new line
+                output.write("    MOV $A $D2\n")
                 output.write("    CMP $D2 $C2\n")
-                output.write("    JMP " + self.ifOperator + " L" + str(self.ifLabel) + "\n")
-                self.labelList.append(" L" + str(self.ifLabel))
-                self.ifLabel += 1
-                self.state = 5
-                self.expectFlag = 0
+
+                if char == "|":
+                    self.reverseFlag()
+                    output.write("    JMP " + self.ifOperator + " B" + str(self.binaryLabel) + "\n")
+
+                    if self.binaryLabel not in self.binaryList:
+                        self.binaryList.append(str(self.binaryLabel))
+                        self.binaryLabel += 1
+                else:
+                    output.write("    JMP " + self.ifOperator + " L" + str(self.ifLabel) + "\n")
                 self.mathFormula = ""
+                self.expectFlag = 1
 
             else:
-                # we read something other than whitespace or an opening curly brace, this is invalid
-                raise ValueError("Syntax error at line {}".format(self.lineno))
+                raise ValueError("Mismatch in binary operator at line {}".format(self.lineno))
+
+        elif self.expectFlag == 4:
+            # here we expect to read another piece of the operator. if not, we just add the char to the RHS's formula
+            if char in BOOLEAN_OPERATORS:
+                self.ifOperator += char
+            else:
+                temp = char
+
+            tokens = tokenize(self.mathFormula)
+            postfix = infixToPostfix(tokens)
+            evaluatePostfix(postfix, self.varList, self.varLocation, self.methodList[self.currentMethod],
+                            self.arrayList, output)
+            self.ifOperator = self.convertOperatorToFlags(self.ifOperator)
+            self.expectFlag = 2
+            self.mathFormula = temp
+            output.write("    MOV $A $C2\n")
 
     def state10(self, char, output):
         """
@@ -962,39 +991,45 @@ class Compiler:
         elif self.expectFlag == 1:
             # we're expecting to read a part of the left hand side's expression. if we read an operator, we evaluate
             # the expression and move on to reading the right hand side's expression.
-            if char in BOOLEAN_OPERATORS:
-                if self.mathFormula == "":
-                    # empty expression (e.g. if ( a > ) )
-                    raise ValueError("Empty expression in if statement at line {}".format(self.lineno))
 
-                tokens = tokenize(self.mathFormula)
-                postfix = infixToPostfix(tokens)
-                evaluatePostfix(postfix, self.varList, self.varLocation, self.methodList[self.currentMethod],
-                                self.arrayList, output)
-                self.ifOperator = self.convertOperatorToFlags(char)
-                self.expectFlag = 2
-                self.mathFormula = ""
-                output.write("    MOV $A $C2\n")
+            if char in BOOLEAN_OPERATORS:
+                # if we read an operator, we may need to read another operator, so we go to flag 4
+                self.ifOperator = char
+                self.expectFlag = 4
 
             else:
                 # otherwise we keep appending to our left hand side's math formula string
                 self.mathFormula += char
 
         elif self.expectFlag == 2:
-            # here we evaluate the right hand side of a while loop.
-            if char == ")":
-                # closing parentheses, this indicates the end of our expression
+            # here we evaluate the right hand side of an if expression.
+            if char == "{":
+                # opening curly brace, end of entire expression
                 if self.mathFormula == "":
                     # empty expression (e.g. if ( a > ) )
                     raise ValueError("Empty expression in if statement at line {}".format(self.lineno))
 
+                # check the math expression to see if it ends with a closing parentheses (needed for if/while)
+                self.checkForClosingParentheses()
                 tokens = tokenize(self.mathFormula)
                 postfix = infixToPostfix(tokens)
                 evaluatePostfix(postfix, self.varList, self.varLocation, self.methodList[self.currentMethod],
                                 self.arrayList, output)
-                self.expectFlag = 2
                 self.mathFormula = ""
                 output.write("    MOV $A $D2\n")
+                output.write("    CMP $D2 $C2\n")
+                output.write("    JMP " + self.ifOperator + " L" + str(self.ifLabel) + "\n")
+                self.labelList.append(" L" + str(self.ifLabel))
+                self.ifLabel += 1
+                self.state = 5
+                self.expectFlag = 0
+
+                if len(self.binaryList) > 0:
+                    output.write("B" + self.binaryList.pop() + ":\n")
+
+            elif char in BINARY_OPERATORS:
+                # in this case we've got some more expressions to evaluate.
+                self.binaryOperator = char
                 self.expectFlag = 3
 
             else:
@@ -1002,25 +1037,45 @@ class Compiler:
                 self.mathFormula += char
 
         elif self.expectFlag == 3:
-            # we've finished reading our if statement, now we wait for an opening curly brace
+            tokens = tokenize(self.mathFormula)
+            postfix = infixToPostfix(tokens)
+            evaluatePostfix(postfix, self.varList, self.varLocation, self.methodList[self.currentMethod],
+                            self.arrayList, output)
+            if char == self.binaryOperator:
 
-            if char in IGNORE_CHARS:
-                # we can still read whitespace or newline chars meanwhile
-                pass
-
-            elif char == "{":
-                # we have our opening curly brace, we can go back to state 5 and begin evaluating a new line
+                output.write("    MOV $A $D2\n")
                 output.write("    CMP $D2 $C2\n")
-                output.write("    JMP " + self.ifOperator + " L" + str(self.ifLabel) + "\n")
-                self.labelList.append(" L" + str(self.ifLabel))
-                self.ifLabel += 1
-                self.state = 5
-                self.expectFlag = 0
+
+                if char == "|":
+                    self.reverseFlag()
+                    output.write("    JMP " + self.ifOperator + " B" + str(self.binaryLabel) + "\n")
+
+                    if self.binaryLabel not in self.binaryList:
+                        self.binaryList.append(str(self.binaryLabel))
+                        self.binaryLabel += 1
+                else:
+                    output.write("    JMP " + self.ifOperator + " L" + str(self.ifLabel) + "\n")
                 self.mathFormula = ""
+                self.expectFlag = 1
 
             else:
-                # we read something other than whitespace or an opening curly brace, this is invalid
-                raise ValueError("Syntax error at line {}".format(self.lineno))
+                raise ValueError("Mismatch in binary operator at line {}".format(self.lineno))
+
+        elif self.expectFlag == 4:
+            # here we expect to read another piece of the operator. if not, we just add the char to the RHS's formula
+            if char in BOOLEAN_OPERATORS:
+                self.ifOperator += char
+            else:
+                temp = char
+
+            tokens = tokenize(self.mathFormula)
+            postfix = infixToPostfix(tokens)
+            evaluatePostfix(postfix, self.varList, self.varLocation, self.methodList[self.currentMethod],
+                            self.arrayList, output)
+            self.ifOperator = self.convertOperatorToFlags(self.ifOperator)
+            self.expectFlag = 2
+            self.mathFormula = temp
+            output.write("    MOV $A $C2\n")
 
     def state11(self, char, output):
         """
@@ -1647,7 +1702,6 @@ class Compiler:
             elif char == DOUBLE_QUOTE:
                 self.quoteFlag = DOUBLE_QUOTE
             else:
-                print(char)
                 raise ValueError("Incorrect syntax at line {}. Char should begin with \" or \'".format(self.lineno))
 
         elif self.expectFlag == 1:
@@ -1746,7 +1800,7 @@ class Compiler:
             flag = "<HE>"
         elif char == "<=":
             flag = "<H>"
-        elif char == "=":
+        elif char == "==":
             flag = "<LH>"
         elif char == ">":
             flag = "<LE>"
@@ -1768,7 +1822,6 @@ class Compiler:
         startingLocation = self.varLocation[self.currentVar]
 
         if len(list) != self.arrayList[self.currentVar]:
-            print(list)
             raise ValueError("Incorrect number of values for array assignment at line {}".format(self.lineno))
 
         for element in list:
@@ -1780,4 +1833,45 @@ class Compiler:
             output.write("    MEMW [4] #" + str(element) + " #" + str(startingLocation) + "\n")
             startingLocation += 4
 
+    def checkForClosingParentheses(self):
+        """
+        This method checks if the math expression ends with a closing parentheses. This is necessary for if statements
+        and while loops.
+        :return:
+        """
+
+        found = False
+
+        length = len(self.mathFormula) - 1
+        while not found and length > 0:
+
+            if self.mathFormula[length] in IGNORE_CHARS:
+                # reading in reverse, we can still read spaces until the first relevant token
+                pass
+            elif self.mathFormula[length] == ")":
+                # closing parentheses means this expression may be valid. function has served its purpose and we break
+                found = True
+                self.mathFormula = self.mathFormula[0:length]
+            else:
+                # we read something that is not a closing parentheses, thus the expression is not valid
+                raise ValueError("Missing closing parentheses in statement at line {}".format(self.lineno))
+            length -= 1
+
+    def reverseFlag(self):
+        """
+        Function takes a flag for || binary operator and reverses the logic. This is needed because if an OR binary
+        operation is true, we can just jump straight to the expression within an if statement or while loop.
+        :return:
+        """
+
+        if self.ifOperator == "<HE>":
+            self.ifOperator = "<L>"
+        elif self.ifOperator == "<H>":
+            self.ifOperator = "<LE>"
+        elif self.ifOperator == "<LE>":
+            self.ifOperator = "<H>"
+        elif self.ifOperator == "<LH>":
+            self.ifOperator = "<E>"
+        elif self.ifOperator == "<L>":
+            self.ifOperator = "<HE>"
 

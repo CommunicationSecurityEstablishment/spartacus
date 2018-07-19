@@ -32,6 +32,7 @@ import re
 
 ACCEPTED_TYPES = ["int", "char"]
 OPERATORS = ['+', '-', '*', '/']
+BINARY_OPERATORS = ["|", "&"]
 BOOLEAN_OPERATORS = ["<", ">", "="]
 IGNORE_CHARS = [" ", "\n"]
 REGISTER_NAMES = ["A", "B", "C", "D", "E", "F", "G"]

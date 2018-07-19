@@ -257,6 +257,7 @@ def evaluatePostfix(postfix, variableList, variableLocation, methodVariables, ar
 
     if len(stack) != 1:
         # If the stack has more than or less than one element, the expression is incorrect.
+        print(stack)
         raise ValueError("invalid expression.")
 
     # our result is then "saved" into register A. The assignment can now be completed.
@@ -299,4 +300,5 @@ def evaluatePostfix(postfix, variableList, variableLocation, methodVariables, ar
             isinstance(int(result), int)
             output.write("    MOV #" + str(result) + " $A\n")
         except ValueError as e:
+            print(result)
             raise ValueError("Invalid mathematical expression")

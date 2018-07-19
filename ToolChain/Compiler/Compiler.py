@@ -149,66 +149,66 @@ class Compiler:
         """
 
         if self.state == 0:
-            self.state0(char, output)
+            self.parseFunctionReturnType(char, output)
 
         elif self.state == 1:
-            self.state1(char, output)
+            self.parseFunctionName(char, output)
 
         elif self.state == 2:
-            self.state2(char, output)
+            self.parseFunctionArgumentType(char, output)
 
         elif self.state == 3:
-            self.state3(char, output)
+            self.parseFunctionArgumentName(char, output)
 
         elif self.state == 4:
-            self.state4(char, output)
+            self.countFunctionArguments(char, output)
 
         elif self.state == 5:
-            self.state5(char, output)
+            self.parsePrimaryIdentifier(char, output)
 
         elif self.state == 6:
-            self.state6(char, output)
+            self.parseIntegerVariableName(char, output)
 
         elif self.state == 7:
-            self.state7(char, output)
+            self.beginIntegerAssignment(char, output)
 
         elif self.state == 8:
-            self.state8(char, output)
+            self.parseFunctionCall(char, output)
 
         elif self.state == 9:
-            self.state9(char, output)
+            self.parseIfStatement(char, output)
 
         elif self.state == 10:
-            self.state10(char, output)
+            self.parseWhileLoop(char, output)
 
         elif self.state == 11:
-            self.state11(char, output)
+            self.parseReturnStatement(char, output)
 
         elif self.state == 12:
-            self.state12(char, output)
+            self.parseArrayDeclaration(char, output)
 
         elif self.state == 13:
-            self.state13(char, output)
+            self.assignValueAtArrayIndex(char, output)
 
         elif self.state == 14:
-            self.state14(char, output)
+            self.parsePointerInitialization(char, output)
 
         elif self.state == 15:
-            self.state15(char, output)
+            self.assignPointerValue(char, output)
 
         elif self.state == 16:
-            self.state16(char, output)
+            self.dereferencePointer(char, output)
 
         elif self.state == 17:
-            self.state17(char, output)
+            self.assignImmediateValueToPointer(char, output)
 
         elif self.state == 18:
-            self.state18(char, output)
+            self.parseCharVariable(char, output)
 
         elif self.state == 19:
-            self.state19(char, output)
+            self.assignCharValue(char, output)
 
-    def state0(self, char, output):
+    def parseFunctionReturnType(self, char, output):
         """
         First step in parsing data. At this step, we begin to read the method header. We expect to read the return data
         type.
@@ -218,18 +218,24 @@ class Compiler:
         """
 
         if char in IGNORE_CHARS and self.expectFlag == 0:
+            # white space or new line before any relevant information
             pass
+
         elif char in IGNORE_CHARS and self.expectFlag == 1:
+            # if we read a space while reading the method's return type, then we assume we're done
             if self.currentType in ACCEPTED_TYPES:
                 self.state = 1
                 self.expectFlag = 0
             else:
+                # the return type read is invalid in this case
                 raise ValueError("Incorrect return type for method declaration at line {}.".format(self.lineno))
+
         else:
+            # we simply append the char to the current type
             self.currentType += char
             self.expectFlag = 1
 
-    def state1(self, char, output):
+    def parseFunctionName(self, char, output):
         """
         Here we expect to read the method's name. Once we reach a space or an opening parentheses, we add the method
         to the methodlist along with its data type.
@@ -245,24 +251,21 @@ class Compiler:
 
         elif char == " " and self.expectFlag == 1:
             # we have our method name, we expect an opening parentheses some time after the first space
-            self.currentVar = ""
-            self.currentType = ""
+            self.resetGlobalValues("01000000000000")
             self.state = 2
 
         elif char == "(":
             # We read the opening parentheses after the method name, no need to check for it later
             self.methodList[self.currentMethod] = {"retType": self.currentType}
             output.write(self.currentMethod + ":\n")
-            self.currentVar = ""
-            self.currentType = ""
+            self.resetGlobalValues("11000000000000")
             self.state = 2
-            self.expectFlag = 0
 
         else:
             self.currentMethod += char
             self.expectFlag = 1
 
-    def state2(self, char, output):
+    def parseFunctionArgumentType(self, char, output):
         """
         Deals with an argument's data type. This is the first step in determining the tuple: arg data type/arg name.
         :param char: char, Individual character read from input file
@@ -279,6 +282,7 @@ class Compiler:
             self.expectFlag = 0
             self.methodList[self.currentMethod] = {"retType": self.currentType}
             output.write(self.currentMethod + ":\n")
+
             if self.currentMethod == "main":
                 output.write("    MOV end $S\n")
 
@@ -312,7 +316,7 @@ class Compiler:
                 # append the character to the current type being read.
                 self.currentType += char
 
-    def state3(self, char, output):
+    def parseFunctionArgumentName(self, char, output):
         """
         This state reads the name of a method argument. Once we have the full name, we couple it with the data type
         read in state2, and we add it to the method's dict of variables. If we read a comma, we know we're ready to
@@ -368,12 +372,12 @@ class Compiler:
             self.currentVar += char
             self.expectFlag = 1
 
-    def state4(self, char, output):
+    def countFunctionArguments(self, char, output):
         """
-        In this state, we've read all the arguments of a method declaration. Now we simply expect to read the opening
+        In this method, we've read all the arguments of a method declaration. Now we simply expect to read the opening
         curly brace "{" to signify the opening body of the method. Here, we also write the appropriate casm instructions
         to the output file. The stack pointer gets moved to "end" if it's the main method, and the S2 pointer must point
-        to the first argument pushed to the stack (if any).
+        to the first argument pushed to the stack (if any). This offset is determined by the number of arguments counted
         :param char: char, Individual character read from input file
         :param output: file, output file to write to
         :return:
@@ -390,9 +394,12 @@ class Compiler:
             # in the body of another method to ensure the correct amount of variables are passed in.
             self.methodList[self.currentMethod]["totalVars"] = self.argCount
             self.state = 5
+
             if self.currentMethod == "main":
+                # the main method would technically be the bottom of the stack frame, so we initialize the stack pointer
                 output.write("    MOV end $S\n")
             else:
+                # we offset the S2 pointer by the amount of arguments passed into the method
                 if self.argCount > 0:
                     output.write("    MOV $S $S2\n")
                     output.write("    SUB #" + str(self.argCount * 4 + 4) + " $S2\n")
@@ -402,7 +409,7 @@ class Compiler:
         else:
             raise ValueError("Syntax error, expecting \"{\", got {}".format(char))
 
-    def state5(self, char, output):
+    def parsePrimaryIdentifier(self, char, output):
         """
         Initial evaluation of a line within the body of a method. We read the input and concatenate to identifier
         string. Once we read a key token we check various cases to see where we need to go with out identifier. This is
@@ -425,8 +432,7 @@ class Compiler:
             if self.identifier == "if":
                 # identifier is an if statement
                 self.state = 9
-                self.identifier = ""
-                self.expectFlag = 0
+                self.resetGlobalValues("10000100000000")
                 self.nestedFlag += 1
 
             elif self.identifier == "while":
@@ -437,26 +443,23 @@ class Compiler:
                 self.whileLabel += 1
                 self.nestedFlag += 1
                 self.whileFlag += 1
-                self.identifier = ""
-                self.expectFlag = 0
+                self.resetGlobalValues("10000100000000")
 
             elif self.identifier == "return":
                 # identifier is a return statement
-                self.expectFlag = 0
+                self.resetGlobalValues("10000100000000")
                 self.state = 11
-                self.identifier = ""
 
             elif (self.identifier in self.varList) or self.identifier in self.methodList[self.currentMethod]:
                 # the identifier is a variable that has already been declared
                 self.currentVar = self.identifier
-                self.identifier = ""
+                self.resetGlobalValues("00000100000000")
                 self.state = 6
                 self.expectFlag = 2
 
             elif self.identifier in ACCEPTED_TYPES:
                 # identifier is a data type, new variable declaration
                 self.currentType = self.identifier
-                self.identifier = ""
 
                 if self.currentType == "int":
                     # new integer variable declaration goes to state 6
@@ -464,28 +467,28 @@ class Compiler:
                 elif self.currentType == "char":
                     # new char variable declaration goes to state 18
                     self.state = 18
-                self.expectFlag = 0
+
+                self.resetGlobalValues("10000100000000")
 
             elif self.identifier in self.methodList:
                 # identifier is a function call
-                self.expectFlag = 0
                 self.state = 8
                 self.functionCall = self.identifier
-                self.identifier = ""
+                self.resetGlobalValues("10000100000000")
 
             elif self.identifier in self.pointerList:
                 # identifier is a pointer
                 self.expectFlag = 2
                 self.state = 14
                 self.currentVar = self.identifier
-                self.identifier = ""
+                self.resetGlobalValues("00000100000000")
 
             elif self.identifier in self.charList:
                 # identifier is a char variable
                 self.expectFlag = 4
                 self.currentVar = self.identifier
-                self.identifier = ""
                 self.state = 19
+                self.resetGlobalValues("00000100000000")
 
             else:
                 # identifier was not valid
@@ -495,24 +498,22 @@ class Compiler:
             # here we have a variable assignment. Variable must be already declared in this case
 
             if (self.identifier in self.varList) or self.identifier in self.methodList[self.currentMethod]:
-                self.expectFlag = 0
                 self.currentVar = self.identifier
                 self.state = 7
-                self.identifier = ""
+                self.resetGlobalValues("10000100000000")
 
             elif self.identifier in self.pointerList:
                 # identifier is a pointer
-                self.expectFlag = 0
                 self.state = 15
                 self.currentVar = self.identifier
-                self.identifier = ""
+                self.resetGlobalValues("10000100000000")
 
             elif self.identifier in self.charList:
                 # identifier is a char variable
                 self.expectFlag = 4
                 self.currentVar = self.identifier
-                self.identifier = ""
                 self.state = 19
+                self.resetGlobalValues("00000100000000")
 
             else:
                 raise ValueError("Invalid assignment at line {}: must be valid variable".format(self.lineno))
@@ -520,9 +521,8 @@ class Compiler:
         elif char == "[" and self.expectFlag == 1:
             # this implies an already declared array
             self.currentVar = self.identifier
-            self.expectFlag = 0
-            self.identifier = ""
             self.state = 13
+            self.resetGlobalValues("10000100000000")
 
         elif char == "(" and self.expectFlag == 1:
             # immediately after the identifier, we read an opening parentheses. Here we cover all possible cases
@@ -531,13 +531,13 @@ class Compiler:
                 # identifier is a function call
                 self.state = 8
                 self.functionCall = self.identifier
-                self.identifier = ""
+                self.resetGlobalValues("00000100000000")
 
             elif self.identifier == "if":
                 # identifier is an if statement
                 self.state = 9
-                self.identifier = ""
                 self.nestedFlag += 1
+                self.resetGlobalValues("00000100000000")
 
             elif self.identifier == "while":
                 # identifier is a while loop indicator
@@ -547,7 +547,7 @@ class Compiler:
                 self.whileLabel += 1
                 self.whileFlag += 1
                 self.nestedFlag += 1
-                self.identifier = ""
+                self.resetGlobalValues("00000100000000")
 
             else:
                 # identifier was not valid
@@ -559,12 +559,9 @@ class Compiler:
             if self.nestedFlag == 0:
                 # if we aren't in any while/if statements, this is the end of our method
                 self.state = 0
-                self.currentMethod = ""
-                self.argCount = 0
-                self.currentVar = ""
-                self.currentType = ""
                 self.varList.clear()
                 self.varLocation.clear()
+                self.resetGlobalValues("01110100000010")
 
             else:
                 # otherwise, we print the appropriate instructions to end the while loop or if statement
@@ -580,7 +577,7 @@ class Compiler:
             self.identifier += char
             self.expectFlag = 1
 
-    def state6(self, char, output):
+    def parseIntegerVariableName(self, char, output):
         """
         Initial variable name declaration. We already have the data type, so now we read its name until we get a
         relevant token to determine what to do with the variable.
@@ -605,21 +602,19 @@ class Compiler:
             # we have the variable name, and we see that an assignment will happen
             self.verifyVariable()
             self.state = 7
-            self.expectFlag = 0
+            self.resetGlobalValues("10000000000000")
 
         elif char == ";" and self.expectFlag == 1:
             # end of variable declaration. we assign its memory location and add it to the variable list
             self.verifyVariable()
-            self.currentVar = ""
-            self.currentType = ""
             self.state = 5
-            self.expectFlag = 0
+            self.resetGlobalValues("11100000000000")
 
         elif char == "[" and self.expectFlag == 1:
             # Here we're ready to declare a new array
             self.validName(self.currentVar)
             self.state = 12
-            self.expectFlag = 0
+            self.resetGlobalValues("10000000000000")
 
         elif self.expectFlag == 2:
             # We reach this step if we have the variable name and we read at least one space
@@ -639,15 +634,13 @@ class Compiler:
 
                 self.validName(self.currentVar)
                 self.state = 7
-                self.expectFlag = 0
+                self.resetGlobalValues("10000000000000")
 
             elif char == ";":
                 # simple declaration (e.g. int a;), we add it to the variable list and allocate a memory location
                 self.verifyVariable()
-                self.currentVar = ""
-                self.currentType = ""
                 self.state = 5
-                self.expectFlag = 0
+                self.resetGlobalValues("11100000000000")
 
             else:
                 raise ValueError("Incorrect syntax at line {}".format(self.lineno))
@@ -657,7 +650,7 @@ class Compiler:
             self.currentVar += char
             self.expectFlag = 1
 
-    def state7(self, char, output):
+    def beginIntegerAssignment(self, char, output):
         """
         Begins variable assignment. This could either be a math formula, or a function call
         :param char: char, Individual character read from input file
@@ -697,10 +690,7 @@ class Compiler:
 
         elif char == ";":
             # End of our math statement. We may begin the evaluation and assign the result to the current variable
-            tokens = tokenize(self.mathFormula)
-            postfix = infixToPostfix(tokens)
-            evaluatePostfix(postfix, self.varList, self.varLocation, self.methodList[self.currentMethod],
-                            self.arrayList, output)
+            self.evaluateMathExpression(output)
 
             if self.currentVar in self.methodList[self.currentMethod]:
                 # The variable is an argument passed into the function. We use the stack pointer to fetch its
@@ -716,17 +706,14 @@ class Compiler:
 
             # now we reset everything
             self.state = 5
-            self.mathFormula = ""
-            self.currentType = ""
-            self.currentVar = ""
-            self.expectFlag = 0
+            self.resetGlobalValues("11101000000000")
 
         else:
             # if we don't read anything else of interest, we simply append the character to the math formula string
             self.mathFormula += char
             self.expectFlag = 1
 
-    def state8(self, char, output):
+    def parseFunctionCall(self, char, output):
         """
         This deals with a function call. This may be on its own line or part of a variable assignment.
         :param char: char, Individual character read from input file
@@ -759,16 +746,14 @@ class Compiler:
 
                 elif re.match(ARRAY_PATTERN, self.functionArg):
                     # variable is an array index
-                    match = re.search(ARRAY_PATTERN, self.functionArg)
-                    operands = match.group(0)
-                    operands = operands.split("[")
-                    operands[1] = operands[1].replace("]", "")
+                    operands = self.parseArrayPattern()
                     output.write("    PUSH #" + str(self.varLocation[operands[0]] + int(operands[1]) * 4) + "\n")
 
                 else:
                     raise ValueError("Invalid variable at line {}".format(self.lineno))
+
                 self.expectFlag = 1
-                self.functionArg = ""
+                self.resetGlobalValues("00000001000000")
                 self.argCount += 1
 
             elif char in IGNORE_CHARS:
@@ -782,10 +767,7 @@ class Compiler:
 
                 elif re.match(ARRAY_PATTERN, self.functionArg):
                     # variable is an array index
-                    match = re.search(ARRAY_PATTERN, self.functionArg)
-                    operands = match.group(0)
-                    operands = operands.split("[")
-                    operands[1] = operands[1].replace("]", "")
+                    operands = self.parseArrayPattern()
                     output.write("    PUSH #" + str(self.varLocation[operands[0]] + int(operands[1]) * 4) + "\n")
 
                 else:
@@ -808,12 +790,13 @@ class Compiler:
                     raise ValueError("Invalid variable at line {}".format(self.lineno))
 
                 self.expectFlag = 1
-                self.functionArg = ""
+                self.resetGlobalValues("00000001000000")
                 self.argCount += 1
 
             elif char in IGNORE_CHARS:
                 # we can keep ignoring whitespace/new line until we read a correct token
                 pass
+
             elif char == ")":
                 # end of arguments. we now expect ";" to end the statement
                 if self.functionArg in self.varList:
@@ -837,13 +820,9 @@ class Compiler:
 
                     if self.currentVar != "":
                         output.write("    MEMW [4] $A #" + str(self.varLocation[self.currentVar]) + "\n")
+
                     output.write("    SUB #" + str(self.argCount * 4) + " $S\n")
-                    self.functionCall = ""
-                    self.functionArg = ""
-                    self.mathFormula = ""
-                    self.currentVar = ""
-                    self.argCount = 0
-                    self.expectFlag = 0
+                    self.resetGlobalValues("10101011000010")
 
                 else:
                     raise ValueError("# of arguments don't match that of function call at line {}".format(self.lineno))
@@ -860,12 +839,11 @@ class Compiler:
             # after a valid function call, we don't read an opening parentheses or whitespace. this is invalid syntax
             raise ValueError("Invalid syntax after function call at line {}".format(self.lineno))
 
-    def state9(self, char, output):
+    def parseIfStatement(self, char, output):
         """
         This state will deal with if statements. We begin by evaluating the left hand side and placing the result in
         register C2. Then we evaluate the right hand side and place in register D2. It's important to note that at this
         time, while loops don't support expressions that contain additional parentheses.
-        TODO: figure out how to handle multiple parentheses
         :param char: char, Individual character read from input file
         :param output: file, output file to write to
         :return:
@@ -902,18 +880,16 @@ class Compiler:
 
                 # check the math expression to see if it ends with a closing parentheses (needed for if/while)
                 self.checkForClosingParentheses()
-                tokens = tokenize(self.mathFormula)
-                postfix = infixToPostfix(tokens)
-                evaluatePostfix(postfix, self.varList, self.varLocation, self.methodList[self.currentMethod],
-                                self.arrayList, output)
-                self.mathFormula = ""
+                self.evaluateMathExpression(output)
+
                 output.write("    MOV $A $D2\n")
                 output.write("    CMP $D2 $C2\n")
                 output.write("    JMP " + self.ifOperator + " L" + str(self.ifLabel) + "\n")
+
                 self.labelList.append(" L" + str(self.ifLabel))
                 self.ifLabel += 1
                 self.state = 5
-                self.expectFlag = 0
+                self.resetGlobalValues("10001000110000")
 
                 if len(self.binaryList) > 0:
                     output.write("B" + self.binaryList.pop() + ":\n")
@@ -928,25 +904,24 @@ class Compiler:
                 self.mathFormula += char
 
         elif self.expectFlag == 3:
-            tokens = tokenize(self.mathFormula)
-            postfix = infixToPostfix(tokens)
-            evaluatePostfix(postfix, self.varList, self.varLocation, self.methodList[self.currentMethod],
-                            self.arrayList, output)
+            self.evaluateMathExpression(output)
             if char == self.binaryOperator:
 
                 output.write("    MOV $A $D2\n")
                 output.write("    CMP $D2 $C2\n")
 
                 if char == "|":
+                    # or binary operator causes the conditional flag to flip, since if true, we can skip immediately
                     self.reverseFlag()
                     output.write("    JMP " + self.ifOperator + " B" + str(self.binaryLabel) + "\n")
 
                     if self.binaryLabel not in self.binaryList:
                         self.binaryList.append(str(self.binaryLabel))
                         self.binaryLabel += 1
+
                 else:
                     output.write("    JMP " + self.ifOperator + " L" + str(self.ifLabel) + "\n")
-                self.mathFormula = ""
+                    self.resetGlobalValues("00001000000000")
                 self.expectFlag = 1
 
             else:
@@ -956,25 +931,22 @@ class Compiler:
             # here we expect to read another piece of the operator. if not, we just add the char to the RHS's formula
             if char in BOOLEAN_OPERATORS:
                 self.ifOperator += char
+                temp = ""
             else:
                 temp = char
 
-            tokens = tokenize(self.mathFormula)
-            postfix = infixToPostfix(tokens)
-            evaluatePostfix(postfix, self.varList, self.varLocation, self.methodList[self.currentMethod],
-                            self.arrayList, output)
+            self.evaluateMathExpression(output)
             self.ifOperator = self.convertOperatorToFlags(self.ifOperator)
             self.expectFlag = 2
             self.mathFormula = temp
             output.write("    MOV $A $C2\n")
 
-    def state10(self, char, output):
+    def parseWhileLoop(self, char, output):
         """
         This state will deal with while loops. We begin by evaluating the left hand side and placing the result in
         register C2. Then we evaluate the right hand side and place in register D2. When writing the assembly code, we
         do exactly as an if statement; however, at the end of the while loop, we need to have a jump condition to go
-        back to the beginning of the loop. It's important to note that at this time, while loops don't support
-        expressions that contain additional parentheses. TODO: figure out how to handle multiple parentheses
+        back to the beginning of the loop.
         :param char: char, Individual character read from input file
         :param output: file, output file to write to
         :return:
@@ -1011,18 +983,16 @@ class Compiler:
 
                 # check the math expression to see if it ends with a closing parentheses (needed for if/while)
                 self.checkForClosingParentheses()
-                tokens = tokenize(self.mathFormula)
-                postfix = infixToPostfix(tokens)
-                evaluatePostfix(postfix, self.varList, self.varLocation, self.methodList[self.currentMethod],
-                                self.arrayList, output)
-                self.mathFormula = ""
+                self.evaluateMathExpression(output)
+
                 output.write("    MOV $A $D2\n")
                 output.write("    CMP $D2 $C2\n")
                 output.write("    JMP " + self.ifOperator + " L" + str(self.ifLabel) + "\n")
+
                 self.labelList.append(" L" + str(self.ifLabel))
                 self.ifLabel += 1
                 self.state = 5
-                self.expectFlag = 0
+                self.resetGlobalValues("10001000110000")
 
                 if len(self.binaryList) > 0:
                     output.write("B" + self.binaryList.pop() + ":\n")
@@ -1037,10 +1007,7 @@ class Compiler:
                 self.mathFormula += char
 
         elif self.expectFlag == 3:
-            tokens = tokenize(self.mathFormula)
-            postfix = infixToPostfix(tokens)
-            evaluatePostfix(postfix, self.varList, self.varLocation, self.methodList[self.currentMethod],
-                            self.arrayList, output)
+            self.evaluateMathExpression(output)
             if char == self.binaryOperator:
 
                 output.write("    MOV $A $D2\n")
@@ -1055,8 +1022,8 @@ class Compiler:
                         self.binaryLabel += 1
                 else:
                     output.write("    JMP " + self.ifOperator + " L" + str(self.ifLabel) + "\n")
-                self.mathFormula = ""
                 self.expectFlag = 1
+                self.resetGlobalValues("00001000000000")
 
             else:
                 raise ValueError("Mismatch in binary operator at line {}".format(self.lineno))
@@ -1065,19 +1032,17 @@ class Compiler:
             # here we expect to read another piece of the operator. if not, we just add the char to the RHS's formula
             if char in BOOLEAN_OPERATORS:
                 self.ifOperator += char
+                temp = ""
             else:
                 temp = char
 
-            tokens = tokenize(self.mathFormula)
-            postfix = infixToPostfix(tokens)
-            evaluatePostfix(postfix, self.varList, self.varLocation, self.methodList[self.currentMethod],
-                            self.arrayList, output)
+            self.evaluateMathExpression(output)
             self.ifOperator = self.convertOperatorToFlags(self.ifOperator)
             self.expectFlag = 2
             self.mathFormula = temp
             output.write("    MOV $A $C2\n")
 
-    def state11(self, char, output):
+    def parseReturnStatement(self, char, output):
         """
         This state deals with return statements. When returning values, we follow the cdecl calling convention.
         Variables in function calls are pushed onto the stack, and the values returned are placed into register A.
@@ -1093,13 +1058,9 @@ class Compiler:
 
         elif char == ";":
             # End of our math statement.
-            tokens = tokenize(self.mathFormula)
-            postfix = infixToPostfix(tokens)
-            evaluatePostfix(postfix, self.varList, self.varLocation, self.methodList[self.currentMethod],
-                            self.arrayList, output)
-            self.expectFlag = 0
-            self.mathFormula = ""
+            self.evaluateMathExpression(output)
             self.state = 5
+            self.resetGlobalValues("10001000000000")
             output.write("    RET\n")
 
         else:
@@ -1107,7 +1068,7 @@ class Compiler:
             self.expectFlag = 1
             self.mathFormula += char
 
-    def state12(self, char, output):
+    def parseArrayDeclaration(self, char, output):
         """
         This state handles the declaration of an array. We check to see if any character before closing bracket "]"
         is a valid integer for the size of the array. We also verify if there is a value assignment following the array
@@ -1134,7 +1095,7 @@ class Compiler:
                     self.arrayList[self.currentVar] = int(self.arrayLength)
                     self.varLocation[self.currentVar] = self.memoryLocation
                     self.memoryLocation += int(self.arrayLength) * 4
-                    self.arrayLength = ""
+                    self.resetGlobalValues("00000000001000")
                     self.expectFlag = 1
                 else:
                     # we have a case where nothing was put in the brackets, ex: "int a[];"
@@ -1153,10 +1114,8 @@ class Compiler:
 
             elif char == ";":
                 # we're done with the declaration.
-                self.expectFlag = 0
-                self.currentVar = ""
-                self.currentType = ""
                 self.state = 5
+                self.resetGlobalValues("11100000000000")
 
             else:
                 # we read a character that's not a semicolon, equal sign, or space
@@ -1196,18 +1155,14 @@ class Compiler:
             elif char == ";":
                 # end of statement, math expression is done, everything is set to go back to state 5.
                 self.assignArrayValues(output)
-                self.expectFlag = 0
-                self.mathFormula = ""
-                self.arrayLength = ""
-                self.currentVar = ""
-                self.currentType = ""
                 self.state = 5
+                self.resetGlobalValues("11101000001000")
 
             else:
                 # we read something other than a semi-colon or a space
                 raise ValueError("Incorrect syntax at line {}".format(self.lineno))
 
-    def state13(self, char, output):
+    def assignValueAtArrayIndex(self, char, output):
         """
         This state deals with assigning a value to a specific array index. Here we assume the array has already been
         declared, and we're simply assigning a value to a specific index.
@@ -1251,23 +1206,17 @@ class Compiler:
 
             if char == ";":
                 # we're done reading the math expression, so we call the mathparser functions and reset
-                tokens = tokenize(self.mathFormula)
-                postfix = infixToPostfix(tokens)
-                evaluatePostfix(postfix, self.varList, self.varLocation, self.methodList[self.currentMethod],
-                                self.arrayList, output)
+                self.evaluateMathExpression(output)
                 output.write("    MEMW [4] $A #" + str(self.varLocation[self.currentVar] + int(self.arrayLength) * 4) +
                              "\n")
-
-                self.expectFlag = 0
-                self.mathFormula = ""
-                self.arrayLength = ""
                 self.state = 5
+                self.resetGlobalValues("10001000001000")
 
             else:
                 # otherwise the char gets added to the math formula
                 self.mathFormula += char
 
-    def state14(self, char, output):
+    def parsePointerInitialization(self, char, output):
         """
         This method deals with initialization of pointers. Pointer variable can only be assigned a single variable,
         with the & prefix. The variable must already be declared, and cannot be paired with any other operand.
@@ -1307,9 +1256,7 @@ class Compiler:
                 self.pointerList.append(self.currentVar)
                 self.varLocation[self.currentVar] = self.memoryLocation
                 self.memoryLocation += 4
-                self.currentVar = ""
-                self.currentType = ""
-                self.expectFlag = 0
+                self.resetGlobalValues("11100000000000")
 
             else:
                 # otherwise we assume we're still reading the name of the variable being declared
@@ -1325,10 +1272,10 @@ class Compiler:
             elif char == "=":
                 # equals sign means we're assigning a value to the pointer (memory address)
                 self.state = 15
-                self.expectFlag = 0
                 self.pointerList.append(self.currentVar)
                 self.varLocation[self.currentVar] = self.memoryLocation
                 self.memoryLocation += 4
+                self.resetGlobalValues("10000000000000")
 
             elif char == ";":
                 # end of declaration, we simple allocate memory location without giving a value
@@ -1336,15 +1283,13 @@ class Compiler:
                 self.pointerList.append(self.currentVar)
                 self.varLocation[self.currentVar] = self.memoryLocation
                 self.memoryLocation += 4
-                self.currentVar = ""
-                self.currentType = ""
-                self.expectFlag = 0
+                self.resetGlobalValues("11100000000000")
 
             else:
                 # we read something other than "=" or ";" in this context, which would be incorrect
                 raise ValueError("Incorrect syntax at line {}".format(self.lineno))
 
-    def state15(self, char, output):
+    def assignPointerValue(self, char, output):
         """
         This method assigns a value to a pointer. The value must be a valid memory address (and must thus be referenced
         by a valid variable using the & character).
@@ -1382,10 +1327,7 @@ class Compiler:
 
                 elif re.match(ARRAY_PATTERN, self.functionArg):
                     # variable is an array index. we parse the variable name and index to determine if they're valid
-                    match = re.search(ARRAY_PATTERN, self.functionArg)
-                    operands = match.group(0)
-                    operands = operands.split("[")
-                    operands[1] = operands[1].replace("]", "")
+                    operands = self.parseArrayPattern()
 
                     if operands[0] not in self.arrayList:
                         raise ValueError("Invalid array variable at line {}".format(self.lineno))
@@ -1415,20 +1357,14 @@ class Compiler:
 
                 elif re.match(ARRAY_PATTERN, self.functionArg):
                     # variable is an array index, we get the memory location at index 0 and add the correct offset
-                    match = re.search(ARRAY_PATTERN, self.functionArg)
-                    operands = match.group(0)
-                    operands = operands.split("[")
-                    operands[1] = operands[1].replace("]", "")
+                    operands = self.parseArrayPattern()
                     output.write("    #" + str(self.varLocation[self.mathFormula] + operands[1] * 4) + " #" +
                                  str(self.varLocation[self.currentVar]) + "\n")
 
                 else:
                     raise ValueError("Invalid variable name at line {}".format(self.lineno))
-                self.expectFlag = 0
-                self.currentVar = ""
-                self.currentType = ""
-                self.mathFormula = ""
                 self.state = 5
+                self.resetGlobalValues("111010000000000")
 
             else:
                 self.mathFormula += char
@@ -1451,10 +1387,7 @@ class Compiler:
 
                 elif re.match(ARRAY_PATTERN, self.functionArg):
                     # variable is an array index, we get the memory location at index 0 and add the correct offset
-                    match = re.search(ARRAY_PATTERN, self.functionArg)
-                    operands = match.group(0)
-                    operands = operands.split("[")
-                    operands[1] = operands[1].replace("]", "")
+                    operands = self.parseArrayPattern()
                     output.write("    #" + str(self.varLocation[self.mathFormula] + operands[1] * 4) + " #" +
                                  str(self.varLocation[self.currentVar]) + "\n")
 
@@ -1462,17 +1395,14 @@ class Compiler:
                     # we already did the check in flag 1, so this technically shouldn't execute and something went wrong
                     raise ValueError("Invalid variable name at line {}".format(self.lineno))
 
-                self.expectFlag = 0
-                self.currentVar = ""
-                self.currentType = ""
-                self.mathFormula = ""
                 self.state = 5
+                self.resetGlobalValues("111010000000000")
 
             else:
                 # we're expecting the end of the statement ";", so anything else in invalid
                 raise ValueError("Syntax error at line {}".format(self.lineno))
 
-    def state16(self, char, output):
+    def dereferencePointer(self, char, output):
         """
         This state deals with dereferencing a pointer. Any variable can be assigned a pointer dereference, but it must
         stand alone as an operand. The memory location stored in the pointer must be a valid variable. It should be
@@ -1508,10 +1438,8 @@ class Compiler:
                 output.write("    MEMR [4] $A $B\n")
                 output.write("    MEMW [4] $B #" + str(self.varLocation[self.currentVar]) + "\n")
 
-                self.expectFlag = 0
-                self.currentVar = ""
-                self.currentType = ""
                 self.state = 5
+                self.resetGlobalValues("111000000000000")
 
             else:
                 # otherwise, we're still reading the pointer variable's name
@@ -1533,16 +1461,14 @@ class Compiler:
                 output.write("    MEMR [4] $A $B\n")
                 output.write("    MEMW [4] $B #" + str(self.varLocation[self.currentVar]) + "\n")
 
-                self.expectFlag = 0
-                self.currentVar = ""
-                self.currentType = ""
                 self.state = 5
+                self.resetGlobalValues("111000000000000")
 
             else:
                 # we didn't read a semi colon or space character, so the syntax is incorrect
                 raise ValueError("Incorrect syntax at line {}".format(self.lineno))
 
-    def state17(self, char, output):
+    def assignImmediateValueToPointer(self, char, output):
         """
         This method allows you to assign an immediate value to a pointer. You're risking accessing an invalid memory
         location by doing this, however. The format should be "*var = int"
@@ -1604,23 +1530,17 @@ class Compiler:
                     # can't have an empty expression (ex: *pointer = ;)
                     raise ValueError("Empty operand at line {}".format(self.lineno))
 
-                tokens = tokenize(self.mathFormula)
-                postfix = infixToPostfix(tokens)
-                evaluatePostfix(postfix, self.varList, self.varLocation, self.methodList[self.currentMethod],
-                                self.arrayList, output)
+                self.evaluateMathExpression(output)
                 output.write("    MEMW [4] $A #" + str(self.varLocation[self.currentVar]) + "\n")
 
-                self.currentVar = ""
-                self.currentType = ""
-                self.expectFlag = 0
-                self.mathFormula = ""
                 self.state = 5
+                self.resetGlobalValues("111010000000000")
 
             else:
                 # otherwise we keep appending to our math formula
                 self.mathFormula += char
 
-    def state18(self, char, output):
+    def parseCharVariable(self, char, output):
         """
         This state takes in the name of the char variable, then appends it to the char list.
         :param char:
@@ -1643,17 +1563,15 @@ class Compiler:
                 self.charList.append(self.currentVar)
                 self.varLocation[self.currentVar] = self.memoryLocation
                 self.memoryLocation += 4
-                self.currentVar = ""
                 self.state = 5
-                self.expectFlag = 0
-                self.currentType = ""
+                self.resetGlobalValues("111000000000000")
 
             elif char == "=":
                 self.charList.append(self.currentVar)
                 self.varLocation[self.currentVar] = self.memoryLocation
                 self.memoryLocation += 4
                 self.state = 19
-                self.expectFlag = 0
+                self.resetGlobalValues("100000000000000")
 
             else:
                 self.currentVar += char
@@ -1666,22 +1584,20 @@ class Compiler:
                 self.charList.append(self.currentVar)
                 self.varLocation[self.currentVar] = self.memoryLocation
                 self.memoryLocation += 4
-                self.currentVar = ""
                 self.state = 5
-                self.expectFlag = 0
-                self.currentType = ""
+                self.resetGlobalValues("111000000000000")
 
             elif char == "=":
                 self.charList.append(self.currentVar)
                 self.varLocation[self.currentVar] = self.memoryLocation
                 self.memoryLocation += 4
                 self.state = 19
-                self.expectFlag = 0
+                self.resetGlobalValues("100000000000000")
 
             else:
                 raise ValueError("Invalid syntax at line {}".format(self.lineno))
 
-    def state19(self, char, output):
+    def assignCharValue(self, char, output):
         """
         This method accepts a value for a char variable. It should be noted that chars will always be a single
         character. The char must be surrounded by either single quotes or double quotes. These must match, meaning we
@@ -1725,13 +1641,10 @@ class Compiler:
             if char in IGNORE_CHARS:
                 pass
             elif char == ";":
-                output.write("    MEMW [4] #" + str(ord(self.mathFormula)) + " #" + str(self.varLocation[self.currentVar]) + "\n")
-                self.currentVar = ""
+                output.write("    MEMW [4] #" + str(ord(self.mathFormula)) + " #" +
+                                     str(self.varLocation[self.currentVar]) + "\n")
                 self.state = 5
-                self.expectFlag = 0
-                self.currentType = ""
-                self.mathFormula = ""
-                self.quoteFlag = ""
+                self.resetGlobalValues("111010000000100")
             else:
                 raise ValueError("Incorrect syntax at line {}".format(self.lineno))
 
@@ -1786,8 +1699,7 @@ class Compiler:
 
         self.methodList[self.currentMethod][self.currentVar] = (self.currentType, self.argCount)
         self.argCount += 1
-        self.currentType = ""
-        self.currentVar = ""
+        self.resetGlobalValues("011000000000000")
 
     def convertOperatorToFlags(self, char):
         """
@@ -1875,3 +1787,83 @@ class Compiler:
         elif self.ifOperator == "<L>":
             self.ifOperator = "<HE>"
 
+    def resetGlobalValues(self, binaryValue):
+        """
+        Due to the large number of temporary variables, this method acts as a global "reset" method that handles every
+        class variable necessary. The binary number passed in represents whether or not each variable needs to be reset.
+        For example, 1010001 would mean the first, third, and last variable require a reset. This is used to simplify
+        the compiler's code, since many variables need resets at different intervals.
+        :param binaryValue:
+        :return:
+        """
+
+        if binaryValue[0] == "1":
+            self.expectFlag = 0
+
+        if binaryValue[1] == "1":
+            self.currentType = ""
+
+        if binaryValue[2] == "1":
+            self.currentVar = ""
+
+        if binaryValue[3] == "1":
+            self.currentMethod = ""
+
+        if binaryValue[4] == "1":
+            self.mathFormula = ""
+
+        if binaryValue[5] == "1":
+            self.identifier = ""
+
+        if binaryValue[6] == "1":
+            self.functionCall = ""
+
+        if binaryValue[7] == "1":
+            self.functionArg = ""
+
+        if binaryValue[8] == "1":
+            self.ifOperator = ""
+
+        if binaryValue[9] == "1":
+            self.binaryOperator = ""
+
+        if binaryValue[10] == "1":
+            self.arrayLength = ""
+
+        if binaryValue[11] == "1":
+            self.quoteFlag = ""
+
+        if binaryValue[11] == "1":
+            self.argCount = 0
+
+        if binaryValue[11] == "1":
+            self.variableCount = 0
+
+    def evaluateMathExpression(self, output):
+        """
+        This is a helper method that removes redundancy from the compiler code. When we want to evaluate a math
+        expression, the same steps are followed universally. We tokenize the string into individual arguments,
+        parse the tokens from infix to postfix, then we evaluate the postfix.
+        :return:
+        """
+
+        tokens = tokenize(self.mathFormula)
+        postfix = infixToPostfix(tokens)
+        evaluatePostfix(postfix, self.varList, self.varLocation, self.methodList[self.currentMethod],
+                        self.arrayList, output)
+
+    def parseArrayPattern(self):
+        """
+        This is a helper method that removes redundancy from the compiler code. When we're looking to match a pattern
+        for an array value at a specific index, the same steps are followed universally. We search for an array pattern
+        (a value followed by a closing square bracket, i.e. "45]"), and extract the value which will be the array's
+        desired index.
+        :return:
+        """
+
+        match = re.search(ARRAY_PATTERN, self.functionArg)
+        operands = match.group(0)
+        operands = operands.split("[")
+        operands[1] = operands[1].replace("]", "")
+
+        return operands

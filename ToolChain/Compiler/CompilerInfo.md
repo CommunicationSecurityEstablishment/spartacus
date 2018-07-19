@@ -23,7 +23,8 @@ for parentheses to fix this).
 maximum, as it varies depending on how many variables are used. This maximum is simply for consistency.
 * Function calls can't be used in complex variable assignment. They can only be used if it's the only operand.
 * Pointers can't dereference other pointers.
-
+* array values must be assigned directly after array variable declaration. However, specific array indices can be 
+assigned any time
 - - -
 This file is part of Spartacus project
 Copyright (C) 2018  CSE

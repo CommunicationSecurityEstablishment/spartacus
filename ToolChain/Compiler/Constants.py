@@ -38,6 +38,7 @@ IGNORE_CHARS = [" ", "\n"]
 REGISTER_NAMES = ["A", "B", "C", "D", "E", "F", "G"]
 SINGLE_QUOTE = "\'"
 DOUBLE_QUOTE = "\""
+MEMORY_START = 0x40000000
 
 
 L_PARENTHESES = '('

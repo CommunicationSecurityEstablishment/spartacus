@@ -27,7 +27,8 @@ from ToolChain.Compiler.Constants import ACCEPTED_TYPES, \
                                          ARRAY_PATTERN, \
                                          SINGLE_QUOTE, \
                                          DOUBLE_QUOTE, \
-                                         BINARY_OPERATORS
+                                         BINARY_OPERATORS, \
+                                         MEMORY_START
 
 from ToolChain.Compiler.MathParser import tokenize, \
                                           infixToPostfix, \
@@ -52,37 +53,45 @@ class Compiler:
     details on supported features and limitations.
     """
 
-    state = 0                    # "States" are used to determine our next path for processing the C file
-    currentVar = ""              # Name of variable being evaluated
-    currentType = ""             # Current data type being read, before method/variable declaration
-    currentMethod = ""           # String containing the current method being evaluated
-    expectFlag = 0               # Used to control what input we expect next
-    mathFormula = ""             # Will contain our fully assembled math expressions for variable assignments
-    memoryLocation = 0x40000000  # Memory location for local variables.
-    varList = []                 # Contains a list of variable names
-    varLocation = {}             # Contains the memory location for all variables
-    methodList = {}              # List of methods, along with their return type, variables (and types), and # of args
-    argCount = 0                 # Used for number of operands in math expression, args in function calls, etc.
-    variableCount = 0            # Number of variables declared in current function.
-    identifier = ""              # Used to determine first token of a line
-    functionCall = ""            # Name of the function we're calling when doing variable assignment
-    whileFlag = 0                # Lets the compiler know if we're in a while loop
-    ifOperator = ""              # Holds the logical operator between two sides of an if boolean expression
-    nestedFlag = 0               # Lets the compiler know if we're in an if statement
-    ifLabel = 0                  # For jump instructions, we need a unique label for every if statement
-    binaryLabel = 0              # For unique labels when dealing with binary operators in if/while statements
-    binaryList = []              # To pop/push labels when dealing with binary operators in if/while statements
-    binaryOperator = ""          # Holds the current binary operator being used in if/while statements
-    lineno = 0                   # Line number for printing error messages
-    functionArg = ""             # Used to read a function call's arguments
-    whileLabel = 0               # For while loops, we need a unique label
-    labelList = []               # List containing names of labels for if/while jumps
-    whileList = []               # List containing the names of while loops
-    arrayList = {}               # Dict containing variables that are arrays
-    arrayLength = ""             # Length of current array variable being evaluated
-    pointerList = []             # List containing variables that are pointers
-    charList = []                # List containing variables that are chars
-    quoteFlag = ""                # Keeps track of whether we used single or double quote to declare a char variable
+    memoryLocation = MEMORY_START  # Memory location for local variables.
+    state = 0                      # "States" are used to determine our next path for processing the C file
+    lineno = 0                     # Line number for printing error messages
+
+    currentVar = ""                # Name of variable being evaluated
+    currentType = ""               # Current data type being read, before method/variable declaration
+    currentMethod = ""             # String containing the current method being evaluated
+    identifier = ""                # Used to determine first token of a line
+    functionCall = ""              # Name of the function we're calling when doing variable assignment
+    functionArg = ""               # Used to read a function call's arguments
+    mathFormula = ""               # Will contain our fully assembled math expressions for variable assignments
+    ifOperator = ""                # Holds the logical operator between two sides of an if boolean expression
+    binaryOperator = ""            # Holds the current binary operator being used in if/while statements
+    arrayLength = ""               # Length of current array variable being evaluated
+    quoteFlag = ""                 # Keeps track of whether we used single or double quote to declare a char variable
+
+    expectFlag = 0                 # Used to control what input we expect next
+    whileFlag = 0                  # Lets the compiler know if we're in a while loop
+    nestedFlag = 0                 # Lets the compiler know if we're in an if statement
+
+    argCount = 0                   # Used for number of operands in math expression, args in function calls, etc.
+    variableCount = 0              # Number of variables declared in current function.
+
+    ifLabel = 0                    # For jump instructions, we need a unique label for every if statement
+    binaryLabel = 0                # For unique labels when dealing with binary operators in if/while statements
+    whileLabel = 0                 # For while loops, we need a unique label
+
+    binaryList = []                # To pop/push labels when dealing with binary operators in if/while statements
+    labelList = []                 # List containing names of labels for if/while jumps
+    whileList = []                 # List containing the names of while loops
+    pointerList = []               # List containing variables that are pointers
+    charList = []                  # List containing variables that are chars
+    varList = []                   # Contains a list of variable names
+    arrayList = {}                 # Dict containing variables that are arrays
+    varLocation = {}               # Contains the memory location for all variables
+    methodList = {}                # List of methods, along with their return type, variables (and types), and # of args
+
+    mainFunctionASM = ""           # String that will contain all the assembled casm code for the main function
+    otherFunctionASM = ""          # String that will contain all the assembled casm code for all other functions
 
     def __init__(self, inputFile=None, outputFile=None):
         """
@@ -123,13 +132,29 @@ class Compiler:
             raise OSError("Couldn't open file {}".format(outputFile))
 
         for line in inputFile:
+            # read each line individually
+            line = line.split("//", maxsplit=1)[0]  # Remove comments from line
             self.lineno += 1
-            for x in line:
-                self.parse(x, output)
 
+            for x in line:
+                # parse each character at a time to make use of each state correctly
+                asmText = self.parse(x, "")
+
+                if self.currentMethod == "main":
+                    # we check if the method being evaluated is the main method
+                    self.mainFunctionASM += asmText
+                else:
+                    # otherwise, we assume it's another function and append to the otherFunctionASM string
+                    self.otherFunctionASM += asmText
+
+        # We want the program to read the main function first, so we'll print that to the output first
+        output.write(self.mainFunctionASM)
+        output.write("    JMP <> end\n")
+        output.write(self.otherFunctionASM)
         output.write("end:\n")
 
         if self.currentMethod != "":
+            # If we finish reading input and we still have a method being evaluated, there's a curly brace missing
             raise ValueError("Missing closing curly brace for end of method/if/while.")
 
         try:
@@ -149,64 +174,66 @@ class Compiler:
         """
 
         if self.state == 0:
-            self.parseFunctionReturnType(char, output)
+            output = self.parseFunctionReturnType(char, output)
 
         elif self.state == 1:
-            self.parseFunctionName(char, output)
+            output = self.parseFunctionName(char, output)
 
         elif self.state == 2:
-            self.parseFunctionArgumentType(char, output)
+            output = self.parseFunctionArgumentType(char, output)
 
         elif self.state == 3:
-            self.parseFunctionArgumentName(char, output)
+            output = self.parseFunctionArgumentName(char, output)
 
         elif self.state == 4:
-            self.countFunctionArguments(char, output)
+            output = self.countFunctionArguments(char, output)
 
         elif self.state == 5:
-            self.parsePrimaryIdentifier(char, output)
+            output = self.parsePrimaryIdentifier(char, output)
 
         elif self.state == 6:
-            self.parseIntegerVariableName(char, output)
+            output = self.parseIntegerVariableName(char, output)
 
         elif self.state == 7:
-            self.beginIntegerAssignment(char, output)
+            output = self.beginIntegerAssignment(char, output)
 
         elif self.state == 8:
-            self.parseFunctionCall(char, output)
+            output = self.parseFunctionCall(char, output)
 
         elif self.state == 9:
-            self.parseIfStatement(char, output)
+            output = self.parseIfStatement(char, output)
 
         elif self.state == 10:
-            self.parseWhileLoop(char, output)
+            output = self.parseWhileLoop(char, output)
 
         elif self.state == 11:
-            self.parseReturnStatement(char, output)
+            output = self.parseReturnStatement(char, output)
 
         elif self.state == 12:
-            self.parseArrayDeclaration(char, output)
+            output = self.parseArrayDeclaration(char, output)
 
         elif self.state == 13:
-            self.assignValueAtArrayIndex(char, output)
+            output = self.assignValueAtArrayIndex(char, output)
 
         elif self.state == 14:
-            self.parsePointerInitialization(char, output)
+            output = self.parsePointerInitialization(char, output)
 
         elif self.state == 15:
-            self.assignPointerValue(char, output)
+            output = self.assignPointerValue(char, output)
 
         elif self.state == 16:
-            self.dereferencePointer(char, output)
+            output = self.dereferencePointer(char, output)
 
         elif self.state == 17:
-            self.assignImmediateValueToPointer(char, output)
+            output = self.assignImmediateValueToPointer(char, output)
 
         elif self.state == 18:
-            self.parseCharVariable(char, output)
+            output = self.parseCharVariable(char, output)
 
         elif self.state == 19:
-            self.assignCharValue(char, output)
+            output = self.assignCharValue(char, output)
+
+        return output
 
     def parseFunctionReturnType(self, char, output):
         """
@@ -235,6 +262,8 @@ class Compiler:
             self.currentType += char
             self.expectFlag = 1
 
+        return output
+
     def parseFunctionName(self, char, output):
         """
         Here we expect to read the method's name. Once we reach a space or an opening parentheses, we add the method
@@ -257,13 +286,15 @@ class Compiler:
         elif char == "(":
             # We read the opening parentheses after the method name, no need to check for it later
             self.methodList[self.currentMethod] = {"retType": self.currentType}
-            output.write(self.currentMethod + ":\n")
+            output += (self.currentMethod + ":\n")
             self.resetGlobalValues("11000000000000")
             self.state = 2
 
         else:
             self.currentMethod += char
             self.expectFlag = 1
+
+        return output
 
     def parseFunctionArgumentType(self, char, output):
         """
@@ -281,10 +312,10 @@ class Compiler:
             # We have our opening parentheses for arguments, we can now look for the first variable's data type
             self.expectFlag = 0
             self.methodList[self.currentMethod] = {"retType": self.currentType}
-            output.write(self.currentMethod + ":\n")
+            output += (self.currentMethod + ":\n")
 
             if self.currentMethod == "main":
-                output.write("    MOV end $S\n")
+                output += "    MOV end $S\n"
 
         elif self.expectFlag == 0:
             # Here we expect to read the first character of the variable's data type
@@ -315,6 +346,8 @@ class Compiler:
 
                 # append the character to the current type being read.
                 self.currentType += char
+
+        return output
 
     def parseFunctionArgumentName(self, char, output):
         """
@@ -372,6 +405,8 @@ class Compiler:
             self.currentVar += char
             self.expectFlag = 1
 
+        return output
+
     def countFunctionArguments(self, char, output):
         """
         In this method, we've read all the arguments of a method declaration. Now we simply expect to read the opening
@@ -397,17 +432,19 @@ class Compiler:
 
             if self.currentMethod == "main":
                 # the main method would technically be the bottom of the stack frame, so we initialize the stack pointer
-                output.write("    MOV end $S\n")
+                output += "    MOV end $S\n"
             else:
                 # we offset the S2 pointer by the amount of arguments passed into the method
                 if self.argCount > 0:
-                    output.write("    MOV $S $S2\n")
-                    output.write("    SUB #" + str(self.argCount * 4 + 4) + " $S2\n")
+                    output += "    MOV $S $S2\n"
+                    output += ("    SUB #" + str(self.argCount * 4 + 4) + " $S2\n")
 
             self.argCount = 0
 
         else:
             raise ValueError("Syntax error, expecting \"{\", got {}".format(char))
+
+        return output
 
     def parsePrimaryIdentifier(self, char, output):
         """
@@ -437,7 +474,7 @@ class Compiler:
 
             elif self.identifier == "while":
                 # identifier is a while loop indicator
-                output.write("LOOP" + str(self.whileLabel) + ":\n")
+                output += ("LOOP" + str(self.whileLabel) + ":\n")
                 self.whileList.append("LOOP" + str(self.whileLabel))
                 self.state = 10
                 self.whileLabel += 1
@@ -541,7 +578,7 @@ class Compiler:
 
             elif self.identifier == "while":
                 # identifier is a while loop indicator
-                output.write("LOOP" + str(self.whileLabel) + ":\n")
+                output += ("LOOP" + str(self.whileLabel) + ":\n")
                 self.whileList.append("LOOP" + str(self.whileLabel))
                 self.state = 10
                 self.whileLabel += 1
@@ -568,14 +605,16 @@ class Compiler:
                 self.nestedFlag -= 1
                 if self.whileFlag > 0:
                     self.whileFlag -= 1
-                    output.write("    JMP <> " + self.whileList.pop() + "\n")
+                    output += ("    JMP <> " + self.whileList.pop() + "\n")
 
-                output.write(self.labelList.pop() + ":\n")
+                output += (self.labelList.pop() + ":\n")
 
         else:
             # append the character to the identifier string is nothing else of interest was read.
             self.identifier += char
             self.expectFlag = 1
+
+        return output
 
     def parseIntegerVariableName(self, char, output):
         """
@@ -631,7 +670,6 @@ class Compiler:
                     self.varLocation[self.currentVar] = self.memoryLocation
                     self.memoryLocation += 4
                     self.variableCount += 1
-
                 self.validName(self.currentVar)
                 self.state = 7
                 self.resetGlobalValues("10000000000000")
@@ -649,6 +687,8 @@ class Compiler:
             # append the character to the current variable's name
             self.currentVar += char
             self.expectFlag = 1
+
+        return output
 
     def beginIntegerAssignment(self, char, output):
         """
@@ -673,7 +713,7 @@ class Compiler:
                 # otherwise, the parentheses is just part of a normal math expression
                 self.mathFormula += char
 
-        elif char == "*":
+        elif char == "*" and self.expectFlag == 0:
             # we're dereferencing a pointer, so we need to handle this differently than a normal variable assignment
             self.state = 16
 
@@ -690,19 +730,19 @@ class Compiler:
 
         elif char == ";":
             # End of our math statement. We may begin the evaluation and assign the result to the current variable
-            self.evaluateMathExpression(output)
+            output = self.evaluateMathExpression(output)
 
             if self.currentVar in self.methodList[self.currentMethod]:
                 # The variable is an argument passed into the function. We use the stack pointer to fetch its
                 # location before writing the value.
-                output.write("    MOV $A2 $S2\n")
-                output.write("    ADD #" + str(self.methodList[self.currentMethod][self.currentVar][1] * 4)
+                output += "    MOV $A2 $S2\n"
+                output += ("    ADD #" + str(self.methodList[self.currentMethod][self.currentVar][1] * 4)
                              + " $A2\n")
-                output.write("    MEMW [4] $A $A2\n")
+                output += "    MEMW [4] $A $A2\n"
 
             else:
                 # The variable is local, so we just write the result to its memory location from the local list.
-                output.write("    MEMW [4] $A #" + str(self.varLocation[self.currentVar]) + "\n")
+                output += ("    MEMW [4] $A #" + str(self.varLocation[self.currentVar]) + "\n")
 
             # now we reset everything
             self.state = 5
@@ -712,6 +752,8 @@ class Compiler:
             # if we don't read anything else of interest, we simply append the character to the math formula string
             self.mathFormula += char
             self.expectFlag = 1
+
+        return output
 
     def parseFunctionCall(self, char, output):
         """
@@ -742,12 +784,12 @@ class Compiler:
             # Tokens ("," and ")") may show up without spaces, so we handle that here too
             if char == ",":
                 if self.functionArg in self.varList:
-                    output.write("    PUSH #" + str(self.varLocation[self.functionArg]) + "\n")
+                    output += ("    PUSH #" + str(self.varLocation[self.functionArg]) + "\n")
 
                 elif re.match(ARRAY_PATTERN, self.functionArg):
                     # variable is an array index
                     operands = self.parseArrayPattern()
-                    output.write("    PUSH #" + str(self.varLocation[operands[0]] + int(operands[1]) * 4) + "\n")
+                    output += ("    PUSH #" + str(self.varLocation[operands[0]] + int(operands[1]) * 4) + "\n")
 
                 else:
                     raise ValueError("Invalid variable at line {}".format(self.lineno))
@@ -763,12 +805,12 @@ class Compiler:
                 # we're done reading arguments for the function. Now we expect to read ";" to end the statement
                 if self.functionArg in self.varList:
                     # must be a valid variable to pass into function
-                    output.write("    PUSH #" + str(self.varLocation[self.functionArg]) + "\n")
+                    output += ("    PUSH #" + str(self.varLocation[self.functionArg]) + "\n")
 
                 elif re.match(ARRAY_PATTERN, self.functionArg):
                     # variable is an array index
                     operands = self.parseArrayPattern()
-                    output.write("    PUSH #" + str(self.varLocation[operands[0]] + int(operands[1]) * 4) + "\n")
+                    output += ("    PUSH #" + str(self.varLocation[operands[0]] + int(operands[1]) * 4) + "\n")
 
                 else:
                     # variable wasn't declared or isn't valid
@@ -785,7 +827,7 @@ class Compiler:
             if char == ",":
                 # here we're notified that other variables will be read.
                 if self.functionArg in self.varList:
-                    output.write("    PUSH #" + str(self.varLocation[self.functionArg]) + "\n")
+                    output += ("    PUSH #" + str(self.varLocation[self.functionArg]) + "\n")
                 else:
                     raise ValueError("Invalid variable at line {}".format(self.lineno))
 
@@ -800,7 +842,7 @@ class Compiler:
             elif char == ")":
                 # end of arguments. we now expect ";" to end the statement
                 if self.functionArg in self.varList:
-                    output.write("    PUSH #" + str(self.varLocation[self.functionArg]) + "\n")
+                    output += ("    PUSH #" + str(self.varLocation[self.functionArg]) + "\n")
                 else:
                     raise ValueError("Invalid variable at line {}".format(self.lineno))
                 self.expectFlag = 4
@@ -815,13 +857,13 @@ class Compiler:
                 # we make sure the amount of arguments passed in matches how many are accepted by the method
                 if self.argCount == self.methodList[self.functionCall]["totalVars"]:
 
-                    output.write("    CALL " + self.functionCall + "\n")
+                    output += ("    CALL " + self.functionCall + "\n")
                     self.state = 5
 
                     if self.currentVar != "":
-                        output.write("    MEMW [4] $A #" + str(self.varLocation[self.currentVar]) + "\n")
+                        output += ("    MEMW [4] $A #" + str(self.varLocation[self.currentVar]) + "\n")
 
-                    output.write("    SUB #" + str(self.argCount * 4) + " $S\n")
+                    output += ("    SUB #" + str(self.argCount * 4) + " $S\n")
                     self.resetGlobalValues("10101011000010")
 
                 else:
@@ -838,6 +880,8 @@ class Compiler:
         else:
             # after a valid function call, we don't read an opening parentheses or whitespace. this is invalid syntax
             raise ValueError("Invalid syntax after function call at line {}".format(self.lineno))
+
+        return output
 
     def parseIfStatement(self, char, output):
         """
@@ -880,11 +924,11 @@ class Compiler:
 
                 # check the math expression to see if it ends with a closing parentheses (needed for if/while)
                 self.checkForClosingParentheses()
-                self.evaluateMathExpression(output)
+                output = self.evaluateMathExpression(output)
 
-                output.write("    MOV $A $D2\n")
-                output.write("    CMP $D2 $C2\n")
-                output.write("    JMP " + self.ifOperator + " L" + str(self.ifLabel) + "\n")
+                output += "    MOV $A $D2\n"
+                output += "    CMP $D2 $C2\n"
+                output += ("    JMP " + self.ifOperator + " L" + str(self.ifLabel) + "\n")
 
                 self.labelList.append(" L" + str(self.ifLabel))
                 self.ifLabel += 1
@@ -892,7 +936,7 @@ class Compiler:
                 self.resetGlobalValues("10001000110000")
 
                 if len(self.binaryList) > 0:
-                    output.write("B" + self.binaryList.pop() + ":\n")
+                    output +=("B" + self.binaryList.pop() + ":\n")
 
             elif char in BINARY_OPERATORS:
                 # in this case we've got some more expressions to evaluate.
@@ -904,23 +948,24 @@ class Compiler:
                 self.mathFormula += char
 
         elif self.expectFlag == 3:
-            self.evaluateMathExpression(output)
+            output = self.evaluateMathExpression(output)
             if char == self.binaryOperator:
 
-                output.write("    MOV $A $D2\n")
-                output.write("    CMP $D2 $C2\n")
+                output += "    MOV $A $D2\n"
+                output += "    CMP $D2 $C2\n"
 
                 if char == "|":
                     # or binary operator causes the conditional flag to flip, since if true, we can skip immediately
                     self.reverseFlag()
-                    output.write("    JMP " + self.ifOperator + " B" + str(self.binaryLabel) + "\n")
+                    output += ("    JMP " + self.ifOperator + " B" + str(self.binaryLabel) + "\n")
 
                     if self.binaryLabel not in self.binaryList:
                         self.binaryList.append(str(self.binaryLabel))
                         self.binaryLabel += 1
+                        self.resetGlobalValues("00001000000000")
 
                 else:
-                    output.write("    JMP " + self.ifOperator + " L" + str(self.ifLabel) + "\n")
+                    output += ("    JMP " + self.ifOperator + " L" + str(self.ifLabel) + "\n")
                     self.resetGlobalValues("00001000000000")
                 self.expectFlag = 1
 
@@ -935,11 +980,13 @@ class Compiler:
             else:
                 temp = char
 
-            self.evaluateMathExpression(output)
+            output = self.evaluateMathExpression(output)
             self.ifOperator = self.convertOperatorToFlags(self.ifOperator)
             self.expectFlag = 2
             self.mathFormula = temp
-            output.write("    MOV $A $C2\n")
+            output += "    MOV $A $C2\n"
+
+        return output
 
     def parseWhileLoop(self, char, output):
         """
@@ -983,11 +1030,11 @@ class Compiler:
 
                 # check the math expression to see if it ends with a closing parentheses (needed for if/while)
                 self.checkForClosingParentheses()
-                self.evaluateMathExpression(output)
+                output = self.evaluateMathExpression(output)
 
-                output.write("    MOV $A $D2\n")
-                output.write("    CMP $D2 $C2\n")
-                output.write("    JMP " + self.ifOperator + " L" + str(self.ifLabel) + "\n")
+                output += "    MOV $A $D2\n"
+                output += "    CMP $D2 $C2\n"
+                output += ("    JMP " + self.ifOperator + " L" + str(self.ifLabel) + "\n")
 
                 self.labelList.append(" L" + str(self.ifLabel))
                 self.ifLabel += 1
@@ -995,7 +1042,7 @@ class Compiler:
                 self.resetGlobalValues("10001000110000")
 
                 if len(self.binaryList) > 0:
-                    output.write("B" + self.binaryList.pop() + ":\n")
+                    output += ("B" + self.binaryList.pop() + ":\n")
 
             elif char in BINARY_OPERATORS:
                 # in this case we've got some more expressions to evaluate.
@@ -1007,21 +1054,21 @@ class Compiler:
                 self.mathFormula += char
 
         elif self.expectFlag == 3:
-            self.evaluateMathExpression(output)
+            output = self.evaluateMathExpression(output)
             if char == self.binaryOperator:
 
-                output.write("    MOV $A $D2\n")
-                output.write("    CMP $D2 $C2\n")
+                output += "    MOV $A $D2\n"
+                output += "    CMP $D2 $C2\n"
 
                 if char == "|":
                     self.reverseFlag()
-                    output.write("    JMP " + self.ifOperator + " B" + str(self.binaryLabel) + "\n")
+                    output += ("    JMP " + self.ifOperator + " B" + str(self.binaryLabel) + "\n")
 
                     if self.binaryLabel not in self.binaryList:
                         self.binaryList.append(str(self.binaryLabel))
                         self.binaryLabel += 1
                 else:
-                    output.write("    JMP " + self.ifOperator + " L" + str(self.ifLabel) + "\n")
+                    output += ("    JMP " + self.ifOperator + " L" + str(self.ifLabel) + "\n")
                 self.expectFlag = 1
                 self.resetGlobalValues("00001000000000")
 
@@ -1036,11 +1083,13 @@ class Compiler:
             else:
                 temp = char
 
-            self.evaluateMathExpression(output)
+            output = self.evaluateMathExpression(output)
             self.ifOperator = self.convertOperatorToFlags(self.ifOperator)
             self.expectFlag = 2
             self.mathFormula = temp
-            output.write("    MOV $A $C2\n")
+            output += "    MOV $A $C2\n"
+
+        return output
 
     def parseReturnStatement(self, char, output):
         """
@@ -1058,15 +1107,19 @@ class Compiler:
 
         elif char == ";":
             # End of our math statement.
-            self.evaluateMathExpression(output)
+            output = self.evaluateMathExpression(output)
             self.state = 5
             self.resetGlobalValues("10001000000000")
-            output.write("    RET\n")
+            if self.nestedFlag > 0 or self.currentMethod != "main":
+                # we don't need a return statement if it's the end of the main method
+                output += "    RET\n"
 
         else:
             # we continue to append the chars to our math formula for the return statement
             self.expectFlag = 1
             self.mathFormula += char
+
+        return output
 
     def parseArrayDeclaration(self, char, output):
         """
@@ -1154,13 +1207,15 @@ class Compiler:
 
             elif char == ";":
                 # end of statement, math expression is done, everything is set to go back to state 5.
-                self.assignArrayValues(output)
+                output = self.assignArrayValues(output)
                 self.state = 5
                 self.resetGlobalValues("11101000001000")
 
             else:
                 # we read something other than a semi-colon or a space
                 raise ValueError("Incorrect syntax at line {}".format(self.lineno))
+
+        return output
 
     def assignValueAtArrayIndex(self, char, output):
         """
@@ -1206,15 +1261,17 @@ class Compiler:
 
             if char == ";":
                 # we're done reading the math expression, so we call the mathparser functions and reset
-                self.evaluateMathExpression(output)
-                output.write("    MEMW [4] $A #" + str(self.varLocation[self.currentVar] + int(self.arrayLength) * 4) +
-                             "\n")
+                output = self.evaluateMathExpression(output)
+                output += ("    MEMW [4] $A #" + str(self.varLocation[self.currentVar] + int(self.arrayLength) * 4) +
+                           "\n")
                 self.state = 5
-                self.resetGlobalValues("10001000001000")
+                self.resetGlobalValues("11101100001000")
 
             else:
                 # otherwise the char gets added to the math formula
                 self.mathFormula += char
+
+        return output
 
     def parsePointerInitialization(self, char, output):
         """
@@ -1289,6 +1346,8 @@ class Compiler:
                 # we read something other than "=" or ";" in this context, which would be incorrect
                 raise ValueError("Incorrect syntax at line {}".format(self.lineno))
 
+        return output
+
     def assignPointerValue(self, char, output):
         """
         This method assigns a value to a pointer. The value must be a valid memory address (and must thus be referenced
@@ -1345,21 +1404,21 @@ class Compiler:
 
                 if self.mathFormula in self.varList:
                     # variable is in regular list, so we assign its memory location to the pointer
-                    output.write("    MEMW [4] #" + str(self.varLocation[self.mathFormula]) + " #" +
+                    output += ("    MEMW [4] #" + str(self.varLocation[self.mathFormula]) + " #" +
                                  str(self.varLocation[self.currentVar]) + "\n")
 
                 elif self.mathFormula in self.methodList[self.currentMethod]:
                     # variable is passed in as argument, we just write the pointer register's value at the right index
-                    output.write("    MOV $A2 $S2\n")
-                    output.write("    ADD #" + str(self.methodList[self.currentMethod][self.currentVar][1] * 4)
+                    output += "    MOV $A2 $S2\n"
+                    output += ("    ADD #" + str(self.methodList[self.currentMethod][self.currentVar][1] * 4)
                                  + " $A2\n")
-                    output.write("    MEMW [4] $A2 #" + str(self.varLocation[self.currentVar]) + "\n")
+                    output += ("    MEMW [4] $A2 #" + str(self.varLocation[self.currentVar]) + "\n")
 
                 elif re.match(ARRAY_PATTERN, self.functionArg):
                     # variable is an array index, we get the memory location at index 0 and add the correct offset
                     operands = self.parseArrayPattern()
-                    output.write("    #" + str(self.varLocation[self.mathFormula] + operands[1] * 4) + " #" +
-                                 str(self.varLocation[self.currentVar]) + "\n")
+                    output += ("    #" + str(self.varLocation[self.mathFormula] + operands[1] * 4) + " #" +
+                               str(self.varLocation[self.currentVar]) + "\n")
 
                 else:
                     raise ValueError("Invalid variable name at line {}".format(self.lineno))
@@ -1375,20 +1434,20 @@ class Compiler:
             elif char == ";":
                 if self.mathFormula in self.varList:
                     # variable is in regular list, so we assign its memory location to the pointer
-                    output.write("    MEMW [4] #" + str(self.varLocation[self.mathFormula]) + " #" +
+                    output += ("    MEMW [4] #" + str(self.varLocation[self.mathFormula]) + " #" +
                                  str(self.varLocation[self.currentVar] + "\n"))
 
                 elif self.mathFormula in self.methodList[self.currentMethod]:
                     # variable is passed in as argument, we just write the pointer register's value at the right index
-                    output.write("    MOV $A2 $S2\n")
-                    output.write("    ADD #" + str(self.methodList[self.currentMethod][self.currentVar][1] * 4)
-                                 + " $A2\n")
-                    output.write("    MEMW [4] $A2 #" + str(self.varLocation[self.currentVar]) + "\n")
+                    output += "    MOV $A2 $S2\n"
+                    output += ("    ADD #" + str(self.methodList[self.currentMethod][self.currentVar][1] * 4) +
+                               " $A2\n")
+                    output += ("    MEMW [4] $A2 #" + str(self.varLocation[self.currentVar]) + "\n")
 
                 elif re.match(ARRAY_PATTERN, self.functionArg):
                     # variable is an array index, we get the memory location at index 0 and add the correct offset
                     operands = self.parseArrayPattern()
-                    output.write("    #" + str(self.varLocation[self.mathFormula] + operands[1] * 4) + " #" +
+                    output += ("    #" + str(self.varLocation[self.mathFormula] + operands[1] * 4) + " #" +
                                  str(self.varLocation[self.currentVar]) + "\n")
 
                 else:
@@ -1401,6 +1460,8 @@ class Compiler:
             else:
                 # we're expecting the end of the statement ";", so anything else in invalid
                 raise ValueError("Syntax error at line {}".format(self.lineno))
+
+        return output
 
     def dereferencePointer(self, char, output):
         """
@@ -1434,12 +1495,12 @@ class Compiler:
 
                 if self.mathFormula not in self.pointerList:
                     raise ValueError("Invalid pointer variable at line {}".format(self.lineno))
-                output.write("    MEMR [4] #" + str(self.varLocation[self.mathFormula]) + " $A\n")
-                output.write("    MEMR [4] $A $B\n")
-                output.write("    MEMW [4] $B #" + str(self.varLocation[self.currentVar]) + "\n")
+                output += ("    MEMR [4] #" + str(self.varLocation[self.mathFormula]) + " $A\n")
+                output += "    MEMR [4] $A $B\n"
+                output += ("    MEMW [4] $B #" + str(self.varLocation[self.currentVar]) + "\n")
 
                 self.state = 5
-                self.resetGlobalValues("111000000000000")
+                self.resetGlobalValues("111010000000000")
 
             else:
                 # otherwise, we're still reading the pointer variable's name
@@ -1457,16 +1518,18 @@ class Compiler:
 
                 if self.mathFormula not in self.pointerList:
                     raise ValueError("Invalid pointer variable at line {}".format(self.lineno))
-                output.write("    MEMR [4] #" + str(self.varLocation[self.mathFormula]) + " $A\n")
-                output.write("    MEMR [4] $A $B\n")
-                output.write("    MEMW [4] $B #" + str(self.varLocation[self.currentVar]) + "\n")
+                output += ("    MEMR [4] #" + str(self.varLocation[self.mathFormula]) + " $A\n")
+                output += "    MEMR [4] $A $B\n"
+                output += ("    MEMW [4] $B #" + str(self.varLocation[self.currentVar]) + "\n")
 
                 self.state = 5
-                self.resetGlobalValues("111000000000000")
+                self.resetGlobalValues("111010000000000")
 
             else:
                 # we didn't read a semi colon or space character, so the syntax is incorrect
                 raise ValueError("Incorrect syntax at line {}".format(self.lineno))
+
+        return output
 
     def assignImmediateValueToPointer(self, char, output):
         """
@@ -1530,8 +1593,8 @@ class Compiler:
                     # can't have an empty expression (ex: *pointer = ;)
                     raise ValueError("Empty operand at line {}".format(self.lineno))
 
-                self.evaluateMathExpression(output)
-                output.write("    MEMW [4] $A #" + str(self.varLocation[self.currentVar]) + "\n")
+                output = self.evaluateMathExpression(output)
+                output += ("    MEMW [4] $A #" + str(self.varLocation[self.currentVar]) + "\n")
 
                 self.state = 5
                 self.resetGlobalValues("111010000000000")
@@ -1539,6 +1602,8 @@ class Compiler:
             else:
                 # otherwise we keep appending to our math formula
                 self.mathFormula += char
+
+        return output
 
     def parseCharVariable(self, char, output):
         """
@@ -1597,6 +1662,8 @@ class Compiler:
             else:
                 raise ValueError("Invalid syntax at line {}".format(self.lineno))
 
+        return output
+
     def assignCharValue(self, char, output):
         """
         This method accepts a value for a char variable. It should be noted that chars will always be a single
@@ -1641,8 +1708,8 @@ class Compiler:
             if char in IGNORE_CHARS:
                 pass
             elif char == ";":
-                output.write("    MEMW [4] #" + str(ord(self.mathFormula)) + " #" +
-                                     str(self.varLocation[self.currentVar]) + "\n")
+                output += ("    MEMW [4] #" + str(ord(self.mathFormula)) + " #" +
+                           str(self.varLocation[self.currentVar]) + "\n")
                 self.state = 5
                 self.resetGlobalValues("111010000000100")
             else:
@@ -1655,6 +1722,8 @@ class Compiler:
                 self.expectFlag = 0
             else:
                 raise ValueError("Incorrect syntax at line {}".format(self.lineno))
+
+        return output
 
     def validName(self, name):
         """
@@ -1742,8 +1811,10 @@ class Compiler:
             except ValueError as e:
                 raise ValueError("Invalid value for array assignment at line {}".format(self.lineno))
 
-            output.write("    MEMW [4] #" + str(element) + " #" + str(startingLocation) + "\n")
+            output += ("    MEMW [4] #" + str(element) + " #" + str(startingLocation) + "\n")
             startingLocation += 4
+
+        return output
 
     def checkForClosingParentheses(self):
         """
@@ -1849,8 +1920,10 @@ class Compiler:
 
         tokens = tokenize(self.mathFormula)
         postfix = infixToPostfix(tokens)
-        evaluatePostfix(postfix, self.varList, self.varLocation, self.methodList[self.currentMethod],
-                        self.arrayList, output)
+        output += evaluatePostfix(postfix, self.varList, self.varLocation, self.methodList[self.currentMethod],
+                                 self.arrayList, output, self.lineno)
+
+        return output
 
     def parseArrayPattern(self):
         """

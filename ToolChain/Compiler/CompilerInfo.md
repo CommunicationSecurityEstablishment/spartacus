@@ -12,6 +12,7 @@ The compiler currently supports the following features:
 * Function calls
 * Multiple function declaration
 * Pointers
+* Single-line comments (in-line comments also valid)
 
 ##Restrictions
 The compiler currently has some restrictions:
@@ -19,12 +20,13 @@ The compiler currently has some restrictions:
 * Currently, arrays may only be indexed with hard coded integers, not variables.
 * If statement and while loop operands can't contain parentheses (we may opt to remove the requirement
 for parentheses to fix this).
-* Math expressions for variable assignment may only have a maximum of 6 operands. This isn't the real 
-maximum, as it varies depending on how many variables are used. This maximum is simply for consistency.
+* Math expressions may only have a maximum of 7 operands.
 * Function calls can't be used in complex variable assignment. They can only be used if it's the only operand.
 * Pointers can't dereference other pointers.
-* array values must be assigned directly after array variable declaration. However, specific array indices can be 
+* Array values must be assigned directly after array variable declaration. However, specific array indices can be 
 assigned any time
+* Only array indices may be passed into functions as arguments at the moment
+* Functions called within another function must already exist before the call
 - - -
 This file is part of Spartacus project
 Copyright (C) 2018  CSE

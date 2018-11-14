@@ -73,6 +73,13 @@ def parseCommandLineArgs():
                         help="This is required if -s option was used on the linker. That will allow "
                              "binary to be loader at correct address specified inside the binary")
 
+    parser.add_argument("-bp", "--breakpoint",
+                        required=False,
+                        nargs =1,
+                        type=str,
+                        help="This is an optional argument. If present, debugger will load breakpoints "
+                        "previously defined and stored in the specified file.")
+
     args = parser.parse_args()
 
     return args
@@ -89,6 +96,7 @@ def validatePaths(argsWithPaths):
     if not os.path.exists(argsWithPaths.input):
         raise ValueError("ERROR: file {} does not exists.".format(argsWithPaths.input,))
     else:
+        # condition only depends on input existence
         if os.path.exists(argsWithPaths.input.split(".")[0] + ".sym"):
             gotSymbols = True
 
@@ -100,6 +108,7 @@ if __name__ == '__main__':
 
     gotSymbols = False
     symbolsFile = None
+    breakpointFile = None
 
     if usableArgs.input is not None:
         gotSymbols = validatePaths(usableArgs)  # Make sure the parsed info is usable before using it!
@@ -109,6 +118,8 @@ if __name__ == '__main__':
         usableArgs.software = False
         usableArgs.address = FIRMWARE_LOAD_ADDRESS
 
+    if usableArgs.breakpoint is not None:
+        breakpointFile = usableArgs.input.split(".")[0] + ".bp"
 
     print("Debug session about to begin, following options will be used")
     print("  input file:             {}".format(usableArgs.input,))
@@ -124,7 +135,8 @@ if __name__ == '__main__':
                         outputFile=usableArgs.output,
                         loadAddress=usableArgs.address,
                         softwareLoader=usableArgs.software,
-                        symbolsFile=symbolsFile)
+                        symbolsFile=symbolsFile,
+                        breakpointFile=breakpointFile)
     if usableArgs.output is not None and os.path.exists(usableArgs.output[0]):
         # The assembler did the job correctly and the out file has been written to disk!
         print("Debug session is over, output file has been written to {}". format(usableArgs.output,))

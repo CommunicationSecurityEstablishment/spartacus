@@ -68,7 +68,9 @@ class Debugger:
                  outputFile=None,
                  loadAddress=DEFAULT_LOAD_ADDRESS,
                  softwareLoader=False,
-                 symbolsFile=None):
+                 symbolsFile=None,
+                 breakpointFile=None):
+
         """
         Building the debugger
         :param inputFile: The input file that needs to be loaded in memory
@@ -76,10 +78,10 @@ class Debugger:
         :param loadAddress: int, the address a which the binary will be loaded. This is required to resolve ref address
         :param softwareLoader: bool, is the loading done with the "software" option
         :param symbolsFile: str, the path to the symbols file to be loaded
+        :param breakpointFile: str, path to breakpoints stored after adding breakpoints in debugger
         :return:
         """
-
-        self.breakPoints = []
+        self.inputFile = inputFile
 
         # First thing we need is to setup logging facilities
         self.setupLoggingFacilities(outputFile)
@@ -97,10 +99,37 @@ class Debugger:
             self.symbols = {}
             self.loadSymbols(symbolsFile=symbolsFile)
 
+        if breakpointFile != "" and breakpointFile is not None:
+            self.breakPoints = self.loadBreakpoints(breakpointFile)
+        else:
+            self.breakPoints =[]
+
         # At this point, debugging session is ready to be used
         self.debugLog("Debugging session is ready to be used. Have fun!")
         self.debug(inputFile=inputFile)
         self.tearDownLoggingFacilities()
+
+    def loadBreakpoints(self, breakpointFile):
+        """
+        This will simply load the breakpoints from file if -bp flag was provided.
+        :param breakpointFile: str, path to file storing breakpoints
+        :return:
+        """
+        self.debugLog("Loading breakpoints from file {}".format(breakpointFile, ))
+
+        file = open(breakpointFile, "r")
+        content = file.readlines()
+        file.close()
+        bp = []
+
+        for line in content:
+            if line != "":
+                line = line.strip("\n")
+                bp.append(int(line))  # breakpoints need to be type int for later conversion to hex address
+
+        self.debugLog("Done loading breakpoints")
+
+        return bp
 
     def loadSymbols(self, symbolsFile=None):
         """
@@ -554,11 +583,14 @@ class Debugger:
     def removeBreakPoint(self, number: int=None):
         """
         This will remove a single breakpoint from the list of breakpoint
+        and call writeBreakPointFile() to update breakpoints in file
         :param number: breakpoint number to remove
         :return:
         """
         self.breakPoints.remove(self.breakPoints[number])
         self.breakPoints.sort()
+        self.writeBreakPointFile()
+
 
     def displayBreakPoints(self):
         """
@@ -577,6 +609,7 @@ class Debugger:
     def addBreakPoint(self, address=None):
         """
         This will simply add a break point into the break point list
+        and call writeBreakPointFile() to update breakpoints in file
         :param address: a valid capua address written in hexadecimal
         :return:
         """
@@ -591,6 +624,18 @@ class Debugger:
 
         self.breakPoints.append(address)
         self.breakPoints.sort()
+
+        self.writeBreakPointFile()
+
+    def writeBreakPointFile(self):
+        """
+        This function writes the breakpoints stored in self.breakpoints to a file
+        :return:
+        """
+        file = open((self.inputFile.split(".")[0]+".bp"), "w")
+        for item in self.breakPoints:
+            file.write("%s\n" % item)
+        file.close()
 
     def debugLog(self, message:str="", screenDisplay:bool=True):
         """

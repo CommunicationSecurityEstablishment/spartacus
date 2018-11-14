@@ -75,7 +75,6 @@ def parseCommandLineArgs():
 
     parser.add_argument("-bp", "--breakpoint",
                         required=False,
-                        nargs =1,
                         type=str,
                         help="This is an optional argument. If present, debugger will load breakpoints "
                         "previously defined and stored in the specified file.")
@@ -85,41 +84,47 @@ def parseCommandLineArgs():
     return args
 
 
-def validatePaths(argsWithPaths):
+def validatePaths(filename):
     """
-    This function will simply validate that the input path exists and that the output path
-    is free for the system to use
-    :param argsWithPaths: An input parsed object as provided by argparse.parse_args()
-    :return: This does not return. Simply raises ValueError in cases where paths are not valid.
+    This function will simply validate if the file exist or not. If not will raise error.
+    :param filename: str, file which existence is checked
+    :return: boolean, status of file existence
     """
-    gotSymbols = False
-    if not os.path.exists(argsWithPaths.input):
-        raise ValueError("ERROR: file {} does not exists.".format(argsWithPaths.input,))
-    else:
-        # condition only depends on input existence
-        if os.path.exists(argsWithPaths.input.split(".")[0] + ".sym"):
-            gotSymbols = True
+    status = False
 
-    return gotSymbols
+    if filename is None:
+        return status
+    elif not os.path.exists(filename):
+        raise ValueError("ERROR: file {} does not exists.".format(filename,))
+    else:
+        status = True
+
+    return status
 
 
 if __name__ == '__main__':
     usableArgs = parseCommandLineArgs()
 
+    gotInputFile = False
     gotSymbols = False
+    gotBreakpointFile = False
     symbolsFile = None
     breakpointFile = None
 
     if usableArgs.input is not None:
-        gotSymbols = validatePaths(usableArgs)  # Make sure the parsed info is usable before using it!
-        symbolsFile = usableArgs.input.split(".")[0] + ".sym" if gotSymbols else ""
+        # Make sure the parsed info is usable before using it!
+        gotInputFile = validatePaths(usableArgs.input)
+        gotSymbols = validatePaths(usableArgs.input.split(".")[0] + ".sym")
+        gotBreakpointFile = validatePaths(usableArgs.breakpoint)
     else:
         usableArgs.input = FIRMWARE_BINARY_FILE_PATH
         usableArgs.software = False
         usableArgs.address = FIRMWARE_LOAD_ADDRESS
 
-    if usableArgs.breakpoint is not None:
-        breakpointFile = usableArgs.input.split(".")[0] + ".bp"
+    if gotBreakpointFile:
+        breakpointFile = usableArgs.breakpoint
+    if gotSymbols:
+        symbolsFile = usableArgs.input.split(".")[0] + ".sym"
 
     print("Debug session about to begin, following options will be used")
     print("  input file:             {}".format(usableArgs.input,))

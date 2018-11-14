@@ -95,11 +95,11 @@ class Debugger:
         self.loadProgram(inputFile=inputFile, loadAddress=loadAddress, softwareLoader=softwareLoader)
 
         # If we have the symbols, load them into the appropriate member
-        if symbolsFile != "" and symbolsFile is not None:
+        if symbolsFile is not None:
             self.symbols = {}
             self.loadSymbols(symbolsFile=symbolsFile)
 
-        if breakpointFile != "" and breakpointFile is not None:
+        if breakpointFile is not None:
             self.breakPoints = self.loadBreakpoints(breakpointFile)
         else:
             self.breakPoints =[]
@@ -111,9 +111,10 @@ class Debugger:
 
     def loadBreakpoints(self, breakpointFile):
         """
-        This will simply load the breakpoints from file if -bp flag was provided.
+        This will simply load the breakpoints from file
         :param breakpointFile: str, path to file storing breakpoints
-        :return:
+        :return: list, breakpoints contained in the breakpoint file
+        HERE
         """
         self.debugLog("Loading breakpoints from file {}".format(breakpointFile, ))
 
@@ -125,7 +126,12 @@ class Debugger:
         for line in content:
             if line != "":
                 line = line.strip("\n")
-                bp.append(int(line))  # breakpoints need to be type int for later conversion to hex address
+                try:
+                    bp.append(int(line))
+                except ValueError as t:
+                    self.debugLog("error error")
+                    raise
+                    #raise ValueError("Error Breakpoint file contains non address lines")
 
         self.debugLog("Done loading breakpoints")
 
@@ -591,7 +597,6 @@ class Debugger:
         self.breakPoints.sort()
         self.writeBreakPointFile()
 
-
     def displayBreakPoints(self):
         """
         This will display breakpoint in deletion order (number is number required when deleting
@@ -622,9 +627,13 @@ class Debugger:
                 self.debugLog("Error while processing address or symbol {}".format(address,))
                 return
 
-        self.breakPoints.append(address)
-        self.breakPoints.sort()
+        if address in self.breakPoints:
+            self.debugLog("Error breakpoint already exist")
+            return
+        else:
+            self.breakPoints.append(address)
 
+        self.breakPoints.sort()
         self.writeBreakPointFile()
 
     def writeBreakPointFile(self):
@@ -644,7 +653,6 @@ class Debugger:
         :param screenDisplay: If true, the message will be sent to the display
         :return: Nothing
         """
-
         if self.outputFile is not None:
             self.outputFile.write(message)
         if screenDisplay:

@@ -116,9 +116,13 @@ class Debugger:
         """
         self.debugLog("Loading breakpoints from file {}".format(breakpointFile, ))
 
-        file = open(breakpointFile, "r")
-        content = file.readlines()
-        file.close()
+        try:
+            with open(breakpointFile, "r") as file:
+                content = file.readlines()
+                file.close()
+        except FileNotFoundError as e:
+            raise FileNotFoundError("Error, file {} not found during breakpoint loading".format(breakpointFile,))
+
         bp = []
 
         for line in content:
@@ -139,12 +143,14 @@ class Debugger:
         :param symbolsFile: str, path to the symbols file
         :return:
         """
-
         self.debugLog("Loading symbols from file {}".format(symbolsFile,))
 
-        file = open(symbolsFile, "r")
-        content = file.readlines()
-        file.close()
+        try:
+            with open(symbolsFile, "r") as file:
+                content = file.readlines()
+                file.close()
+        except FileNotFoundError as e:
+            raise FileNotFoundError("Error, symbols file {} not found during symbols loading".format(symbolsFile,))
 
         for line in content:
             if line != "":
@@ -259,9 +265,12 @@ class Debugger:
         """
         content = b""
 
-        binFile = open(inputFile, "rb")
-        content = binFile.read()
-        binFile.close()
+        try:
+            with open(inputFile, "rb") as binFile:
+                content = binFile.read()
+                binFile.close()
+        except FileNotFoundError as e:
+            raise FileNotFoundError("Error, file {} not found while retrieving binary data".format(inputFile,))
 
         return content
 
@@ -271,7 +280,6 @@ class Debugger:
         debugging session.
         :return:
         """
-
         while True:
             self.debugLog("\nNext instruction to be executed:")
             self.displayNextInstruction()

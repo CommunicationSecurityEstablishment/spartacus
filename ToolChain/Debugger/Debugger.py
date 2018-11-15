@@ -70,7 +70,6 @@ class Debugger:
                  softwareLoader=False,
                  symbolsFile=None,
                  breakpointFile=None):
-
         """
         Building the debugger
         :param inputFile: The input file that needs to be loaded in memory
@@ -81,7 +80,7 @@ class Debugger:
         :param breakpointFile: str, path to breakpoints stored after adding breakpoints in debugger
         :return:
         """
-        self.inputFile = inputFile
+        self.breakpointFile = breakpointFile
 
         # First thing we need is to setup logging facilities
         self.setupLoggingFacilities(outputFile)
@@ -99,8 +98,8 @@ class Debugger:
             self.symbols = {}
             self.loadSymbols(symbolsFile=symbolsFile)
 
-        if breakpointFile is not None:
-            self.breakPoints = self.loadBreakpoints(breakpointFile)
+        if self.breakpointFile is not None:
+            self.breakPoints = self.loadBreakpoints(self.breakpointFile)
         else:
             self.breakPoints =[]
 
@@ -114,7 +113,6 @@ class Debugger:
         This will simply load the breakpoints from file
         :param breakpointFile: str, path to file storing breakpoints
         :return: list, breakpoints contained in the breakpoint file
-        HERE
         """
         self.debugLog("Loading breakpoints from file {}".format(breakpointFile, ))
 
@@ -128,10 +126,8 @@ class Debugger:
                 line = line.strip("\n")
                 try:
                     bp.append(int(line))
-                except ValueError as t:
-                    self.debugLog("error error")
-                    raise
-                    #raise ValueError("Error Breakpoint file contains non address lines")
+                except ValueError as e:
+                    raise ValueError("Error, can't parse breakpoint file, invalid address")
 
         self.debugLog("Done loading breakpoints")
 
@@ -641,7 +637,7 @@ class Debugger:
         This function writes the breakpoints stored in self.breakpoints to a file
         :return:
         """
-        file = open((self.inputFile.split(".")[0]+".bp"), "w")
+        file = open(self.breakpointFile, "w")
         for item in self.breakPoints:
             file.write("%s\n" % item)
         file.close()

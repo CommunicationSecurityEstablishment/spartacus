@@ -76,6 +76,7 @@ def parseCommandLineArgs():
     parser.add_argument("-bp", "--breakpoint",
                         required=False,
                         type=str,
+                        default=None,
                         help="This is an optional argument. If present, debugger will load breakpoints "
                         "previously defined and stored in the specified file.")
 
@@ -84,45 +85,73 @@ def parseCommandLineArgs():
     return args
 
 
-def validatePaths(filename):
+def validateRequiredFiles(filename, ext=None):
     """
-    This function will simply validate if the file exist or not. If not will raise error.
+    This function will simply validate file existence and file extension.
+    If either is not true will raise error.
     :param filename: str, file which existence is checked
+    :param ext: str, expected extension
     :return: boolean, status of file existence
     """
     status = False
 
-    if filename is None:
-        return status
-    elif not os.path.exists(filename):
-        raise ValueError("ERROR: file {} does not exists.".format(filename,))
+    if not os.path.exists(filename):
+        raise ValueError("ERROR: File {} does not exists.".format(filename,))
     else:
+        fileExt = "."+filename.split(".")[1]
+        if fileExt != ext:
+            raise ValueError("ERROR: Incorrect file extension on file {}".format(filename,))
         status = True
 
     return status
+
+def validateBreakPointFile(usable_args, ext=None):
+    """
+    This function will check the inputted breakpoint file and handle the cases.
+    If either is not true will raise error.
+    :param usable_args: An input parsed object as provided by argparse.parse_args()
+    :param ext: str, expected extension for breakpoint file
+    :return inputBreakpointFile: str, name of the breakpointFile that will be used by Debugger
+    """
+    inputBreakpointFile = usable_args.breakpoint
+
+    if inputBreakpointFile is None:
+        inputBreakpointFile = usable_args.input.split(".")[0]+".bp"
+        file = open(inputBreakpointFile, "w")
+        file.close()
+        return inputBreakpointFile
+    elif not os.path.exists(inputBreakpointFile):
+        inputFileExt = "."+inputBreakpointFile.split(".")[1]
+        if inputFileExt != ext:
+            raise ValueError("ERROR: Incorrect file extension on Breakpoint file {}".format(inputBreakpointFile,))
+        file = open(inputBreakpointFile, "w")
+        file.close()
+        return inputBreakpointFile
+    elif os.path.exists(inputBreakpointFile):
+        inputFileExt = "."+inputBreakpointFile.split(".")[1]
+        if inputFileExt != ext:
+            raise ValueError("ERROR: Incorrect file extension on Breakpoint file {}".format(inputBreakpointFile,))
+        return inputBreakpointFile
 
 
 if __name__ == '__main__':
     usableArgs = parseCommandLineArgs()
 
-    gotInputFile = False
+    goodInputFile = False
     gotSymbols = False
-    gotBreakpointFile = False
     symbolsFile = None
     breakpointFile = None
 
     if usableArgs.input is not None:
         # Make sure the parsed info is usable before using it!
-        gotInputFile = validatePaths(usableArgs.input)
-        gotSymbols = validatePaths(usableArgs.input.split(".")[0] + ".sym")
-        gotBreakpointFile = validatePaths(usableArgs.breakpoint)
+        goodInputFile = validateRequiredFiles(usableArgs.input, ext=".bin")
+        gotSymbols = validateRequiredFiles(usableArgs.input.split(".")[0] + ".sym", ext=".sym")
+        breakpointFile = validateBreakPointFile(usableArgs, ext=".bp")
     else:
         usableArgs.input = FIRMWARE_BINARY_FILE_PATH
         usableArgs.software = False
         usableArgs.address = FIRMWARE_LOAD_ADDRESS
 
-    if gotBreakpointFile:
-        breakpointFile = usableArgs.breakpoint
     if gotSymbols:
         symbolsFile = usableArgs.input.split(".")[0] + ".sym"
 

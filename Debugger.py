@@ -27,6 +27,7 @@ from ToolChain.Linker.Constants import DEFAULT_LOAD_ADDRESS, UNDEFINED
 
 import argparse
 import os
+from pathlib import Path
 
 __author__ = "CSE"
 __copyright__ = "Copyright 2015, CSE"
@@ -85,25 +86,23 @@ def parseCommandLineArgs():
     return args
 
 
-def validateRequiredFiles(filename, ext=None):
+def validateFilePath(filename, ext=None):
     """
     This function will simply validate file existence and file extension.
-    If either is not true will raise error.
-    :param filename: str, file which existence is checked
+    If either is not true, then will raise an error.
+    :param filename: str, file path to be validated
     :param ext: str, expected extension
-    :return: boolean, status of file existence
+    :return: boolean True,
     """
-    status = False
-
     if not os.path.exists(filename):
         raise ValueError("ERROR: File {} does not exists.".format(filename,))
     else:
-        fileExt = "."+filename.split(".")[1]
+        fileExt = filename.split(".")[-1]
         if fileExt != ext:
             raise ValueError("ERROR: Incorrect file extension on file {}".format(filename,))
-        status = True
 
-    return status
+    return True
+
 
 def validateBreakPointFile(usable_args, ext=None):
     """
@@ -117,18 +116,16 @@ def validateBreakPointFile(usable_args, ext=None):
 
     if inputBreakpointFile is None:
         inputBreakpointFile = usable_args.input.split(".")[0]+".bp"
-        file = open(inputBreakpointFile, "w")
-        file.close()
+        Path(inputBreakpointFile).touch()
         return inputBreakpointFile
     elif not os.path.exists(inputBreakpointFile):
-        inputFileExt = "."+inputBreakpointFile.split(".")[1]
+        inputFileExt = inputBreakpointFile.split(".")[-1]
         if inputFileExt != ext:
             raise ValueError("ERROR: Incorrect file extension on Breakpoint file {}".format(inputBreakpointFile,))
-        file = open(inputBreakpointFile, "w")
-        file.close()
+        Path(inputBreakpointFile).touch()
         return inputBreakpointFile
     elif os.path.exists(inputBreakpointFile):
-        inputFileExt = "."+inputBreakpointFile.split(".")[1]
+        inputFileExt = inputBreakpointFile.split(".")[-1]
         if inputFileExt != ext:
             raise ValueError("ERROR: Incorrect file extension on Breakpoint file {}".format(inputBreakpointFile,))
         return inputBreakpointFile
@@ -144,9 +141,9 @@ if __name__ == '__main__':
 
     if usableArgs.input is not None:
         # Make sure the parsed info is usable before using it!
-        goodInputFile = validateRequiredFiles(usableArgs.input, ext=".bin")
-        gotSymbols = validateRequiredFiles(usableArgs.input.split(".")[0] + ".sym", ext=".sym")
-        breakpointFile = validateBreakPointFile(usableArgs, ext=".bp")
+        goodInputFile = validateFilePath(usableArgs.input, ext="bin")
+        gotSymbols = validateFilePath(usableArgs.input.split(".")[0] + ".sym", ext="sym")
+        breakpointFile = validateBreakPointFile(usableArgs, ext="bp")
     else:
         usableArgs.input = FIRMWARE_BINARY_FILE_PATH
         usableArgs.software = False

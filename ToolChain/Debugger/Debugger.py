@@ -98,7 +98,7 @@ class Debugger:
             self.symbols = {}
             self.loadSymbols(symbolsFile=symbolsFile)
 
-        if self.breakpointFile is not None:
+        if self.breakpointFile is not '':
             self.breakPoints = self.loadBreakpoints(self.breakpointFile)
 
         # At this point, debugging session is ready to be used
@@ -591,7 +591,8 @@ class Debugger:
         """
         self.breakPoints.remove(self.breakPoints[number])
         self.breakPoints.sort()
-        self.writeBreakPointFile()
+        if self.breakpointFile is not '':
+            self.writeBreakPointFile()
 
     def displayBreakPoints(self):
         """
@@ -623,14 +624,13 @@ class Debugger:
                 self.debugLog("Error while processing address or symbol {}".format(address,))
                 return
 
-        if address in self.breakPoints:
-            self.debugLog("Error breakpoint already exist")
-            return
-        else:
+        if address not in self.breakPoints:
             self.breakPoints.append(address)
-
-        self.breakPoints.sort()
-        self.writeBreakPointFile()
+            self.breakPoints.sort()
+            if self.breakpointFile is not '':
+                self.writeBreakPointFile()
+        else:
+            self.debugLog("Error breakpoint already exist")
 
     def writeBreakPointFile(self):
         """

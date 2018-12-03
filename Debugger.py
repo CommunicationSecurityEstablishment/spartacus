@@ -28,6 +28,7 @@ from ToolChain.Linker.Constants import DEFAULT_LOAD_ADDRESS, UNDEFINED
 import argparse
 import os
 from pathlib import Path
+import socket
 
 __author__ = "CSE"
 __copyright__ = "Copyright 2015, CSE"
@@ -77,7 +78,7 @@ def parseCommandLineArgs():
     parser.add_argument("-bp", "--breakpoint",
                         required=False,
                         type=str,
-                        default=None,
+                        default='',
                         help="This is an optional argument. If present, debugger will load breakpoints "
                         "previously defined and stored in the specified file.")
 
@@ -104,30 +105,20 @@ def validateFilePath(filename, ext=None):
     return True
 
 
-def validateBreakPointFile(usable_args, ext=None):
+def validateBreakPointFile(usable_args):
     """
-    This function will check the inputted breakpoint file and handle the cases.
-    If either is not true will raise error.
+    This function will check if user provided a breakpoint file.
+    If user provided a file that does not exist, function will create the file.
+    If user did not provide a file, no breakpoint file will be used.
     :param usable_args: An input parsed object as provided by argparse.parse_args()
-    :param ext: str, expected extension for breakpoint file
     :return inputBreakpointFile: str, name of the breakpointFile that will be used by Debugger
     """
     inputBreakpointFile = usable_args.breakpoint
 
-    if inputBreakpointFile is None:
-        inputBreakpointFile = usable_args.input.split(".")[0]+".bp"
+    if not os.path.exists(inputBreakpointFile):
         Path(inputBreakpointFile).touch()
         return inputBreakpointFile
-    elif not os.path.exists(inputBreakpointFile):
-        inputFileExt = inputBreakpointFile.split(".")[-1]
-        if inputFileExt != ext:
-            raise ValueError("ERROR: Incorrect file extension on Breakpoint file {}".format(inputBreakpointFile,))
-        Path(inputBreakpointFile).touch()
-        return inputBreakpointFile
-    elif os.path.exists(inputBreakpointFile):
-        inputFileExt = inputBreakpointFile.split(".")[-1]
-        if inputFileExt != ext:
-            raise ValueError("ERROR: Incorrect file extension on Breakpoint file {}".format(inputBreakpointFile,))
+    else:
         return inputBreakpointFile
 
 
@@ -137,13 +128,13 @@ if __name__ == '__main__':
     goodInputFile = False
     gotSymbols = False
     symbolsFile = None
-    breakpointFile = None
+    breakpointFile = ''
 
     if usableArgs.input is not None:
         # Make sure the parsed info is usable before using it!
         goodInputFile = validateFilePath(usableArgs.input, ext="bin")
         gotSymbols = validateFilePath(usableArgs.input.split(".")[0] + ".sym", ext="sym")
-        breakpointFile = validateBreakPointFile(usableArgs, ext="bp")
+        breakpointFile = validateBreakPointFile(usableArgs)
     else:
         usableArgs.input = FIRMWARE_BINARY_FILE_PATH
         usableArgs.software = False
@@ -155,9 +146,13 @@ if __name__ == '__main__':
     print("Debug session about to begin, following options will be used")
     print("  input file:             {}".format(usableArgs.input,))
     if gotSymbols:
-        print("  symbols file:             {}".format(symbolsFile,))
+        print("  symbols file:           {}".format(symbolsFile,))
     if usableArgs.output is not None:
-        print("  output file:            {}".format(usableArgs.output,))
+        print("  output file:          {}".format(usableArgs.output,))
+    if breakpointFile is not '':
+        print("  breakpoint file:        {}".format(breakpointFile,))
+    else:
+        print("  session starting without breakpoint file")
 
     if usableArgs.address is None:
         usableArgs.address = DEFAULT_LOAD_ADDRESS

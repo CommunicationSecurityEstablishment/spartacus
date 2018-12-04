@@ -58,17 +58,18 @@ class Debugger:
     will create an execution environment load the input file to that environment and start execution as
     required.
     """
-
     outputFile = None
     capua = None
-    breakPoints = None
+    breakPoints = []
     symbols = None
+    breakpointFile = None
 
     def __init__(self, inputFile=None,
                  outputFile=None,
                  loadAddress=DEFAULT_LOAD_ADDRESS,
                  softwareLoader=False,
-                 symbolsFile=None):
+                 symbolsFile=None,
+                 breakpointFile=None):
         """
         Building the debugger
         :param inputFile: The input file that needs to be loaded in memory
@@ -76,10 +77,10 @@ class Debugger:
         :param loadAddress: int, the address a which the binary will be loaded. This is required to resolve ref address
         :param softwareLoader: bool, is the loading done with the "software" option
         :param symbolsFile: str, the path to the symbols file to be loaded
+        :param breakpointFile: str, path to breakpoints stored after adding breakpoints in debugger
         :return:
         """
-
-        self.breakPoints = []
+        self.breakpointFile = breakpointFile
 
         # First thing we need is to setup logging facilities
         self.setupLoggingFacilities(outputFile)
@@ -93,14 +94,48 @@ class Debugger:
         self.loadProgram(inputFile=inputFile, loadAddress=loadAddress, softwareLoader=softwareLoader)
 
         # If we have the symbols, load them into the appropriate member
-        if symbolsFile != "" and symbolsFile is not None:
+        if symbolsFile is not None:
             self.symbols = {}
             self.loadSymbols(symbolsFile=symbolsFile)
+
+        if self.breakpointFile is not '':
+            self.breakPoints = self.loadBreakpoints(self.breakpointFile)
 
         # At this point, debugging session is ready to be used
         self.debugLog("Debugging session is ready to be used. Have fun!")
         self.debug(inputFile=inputFile)
         self.tearDownLoggingFacilities()
+
+    def loadBreakpoints(self, breakpointFile):
+        """
+        This will simply load the breakpoints from file
+        :param breakpointFile: str, path to file storing breakpoints
+        :return: list, breakpoints contained in the breakpoint file
+        """
+        self.debugLog("Loading breakpoints from file {}".format(breakpointFile, ))
+
+        try:
+            with open(breakpointFile, "r") as file:
+                breakpointFileContent = file.readlines()
+        except FileNotFoundError as e:
+            raise FileNotFoundError("Error, file {} not found during breakpoint loading".format(breakpointFile,))
+
+        breakPoints = []
+        lineNumber =1
+
+        for line in breakpointFileContent:
+            if line != "":
+                line = line.strip("\n")
+                try:
+                    breakPoints.append(int(line))
+                    lineNumber += 1
+                except ValueError as e:
+                    raise ValueError("Error, invalid address at line {} in {}. "
+                                     "Address must be an integer.".format(lineNumber, breakpointFile,))
+
+        self.debugLog("Done loading breakpoints")
+
+        return breakPoints
 
     def loadSymbols(self, symbolsFile=None):
         """
@@ -108,12 +143,13 @@ class Debugger:
         :param symbolsFile: str, path to the symbols file
         :return:
         """
-
         self.debugLog("Loading symbols from file {}".format(symbolsFile,))
 
-        file = open(symbolsFile, "r")
-        content = file.readlines()
-        file.close()
+        try:
+            with open(symbolsFile, "r") as file:
+                content = file.readlines()
+        except FileNotFoundError as e:
+            raise FileNotFoundError("Error, symbols file {} not found during symbols loading".format(symbolsFile,))
 
         for line in content:
             if line != "":
@@ -129,7 +165,6 @@ class Debugger:
         :param symbol: str, the symbol to be translated
         :return: int, the address where to find the symbol, none if symbol is can't be resolved
         """
-
         if "." not in symbol:
             # User is trying to go without file resolution
             found = None
@@ -196,7 +231,6 @@ class Debugger:
         :param softwareLoader: bool, is the loading done with the "software" option
         :return:
         """
-
         # First we get the content of the binary file that needs to be loaded into memory
         content = self.getBinary(inputFile)
 
@@ -228,9 +262,11 @@ class Debugger:
         """
         content = b""
 
-        binFile = open(inputFile, "rb")
-        content = binFile.read()
-        binFile.close()
+        try:
+            with open(inputFile, "rb") as binFile:
+                content = binFile.read()
+        except FileNotFoundError as e:
+            raise FileNotFoundError("Error, file {} not found while retrieving binary data".format(inputFile,))
 
         return content
 
@@ -240,7 +276,6 @@ class Debugger:
         debugging session.
         :return:
         """
-
         while True:
             self.debugLog("\nNext instruction to be executed:")
             self.displayNextInstruction()
@@ -266,7 +301,6 @@ class Debugger:
         :param x: int, how many instructions do we want to display
         :return:
         """
-
         # We have to validate the user used a symbol for the address
         if type(address) is not int:
             try:
@@ -362,7 +396,6 @@ class Debugger:
         This will display cpu register to the console
         :return:
         """
-
         # Display all registers to the console
         self.debugLog("Register information for {}".format(self.capua.eu.name,))
         self.debugLog("{} = {}  {}".format("A    ", self.capua.eu.A, hex(self.capua.eu.A),))
@@ -397,7 +430,6 @@ class Debugger:
         :param displayFormat:
         :return: Nothing, simply display the thing
         """
-
         # We have to validate the user used a symbol for the address
         try:
             address = int(address, 16)
@@ -473,7 +505,6 @@ class Debugger:
         :param command: str, a string that needs to be parsed
         :return:
         """
-
         brokenCommand = command.split()
 
         if len(brokenCommand) == 0:
@@ -554,11 +585,14 @@ class Debugger:
     def removeBreakPoint(self, number: int=None):
         """
         This will remove a single breakpoint from the list of breakpoint
+        and updates the breakpoints in file
         :param number: breakpoint number to remove
         :return:
         """
         self.breakPoints.remove(self.breakPoints[number])
         self.breakPoints.sort()
+        if self.breakpointFile is not '':
+            self.writeBreakPointFile()
 
     def displayBreakPoints(self):
         """
@@ -577,6 +611,7 @@ class Debugger:
     def addBreakPoint(self, address=None):
         """
         This will simply add a break point into the break point list
+        and updates the breakpoints in file
         :param address: a valid capua address written in hexadecimal
         :return:
         """
@@ -589,8 +624,25 @@ class Debugger:
                 self.debugLog("Error while processing address or symbol {}".format(address,))
                 return
 
-        self.breakPoints.append(address)
-        self.breakPoints.sort()
+        if address not in self.breakPoints:
+            self.breakPoints.append(address)
+            self.breakPoints.sort()
+            if self.breakpointFile is not '':
+                self.writeBreakPointFile()
+        else:
+            self.debugLog("Error breakpoint already exist")
+
+    def writeBreakPointFile(self):
+        """
+        This function writes the breakpoints stored in self.breakpoints to a file
+        :return:
+        """
+        try:
+            with open(self.breakpointFile, "w") as file:
+                for item in self.breakPoints:
+                    file.write("%s\n" % item)
+        except PermissionError as e:
+            raise PermissionError("Error, unable to update breakpoints. Permission denied {}".format(self.breakpointFile,))
 
     def debugLog(self, message:str="", screenDisplay:bool=True):
         """
@@ -599,7 +651,6 @@ class Debugger:
         :param screenDisplay: If true, the message will be sent to the display
         :return: Nothing
         """
-
         if self.outputFile is not None:
             self.outputFile.write(message)
         if screenDisplay:
